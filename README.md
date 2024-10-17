@@ -115,7 +115,11 @@ The executable will be compiled in the following directory: `/build/src/receiver
   ```
 
 ## Testing
-Those samples have been tested under Mac OS Ventura 13.6.8 (Apple M2 Ultra) with VideoMaster SDK 6.25.2.
+Those samples have been tested with VideoMaster SDK 6.25.2 on:
+
+ - Mac OS Ventura 13.6.8 (Apple M2 Ultra)
+ - Windows Server 2022
+ - Ubuntu Linux 20.04 LTS
 
 ## Support
 For any questions or issues related to the NMOS VHD Samples, please refer to the [project's issue tracker](https://github.com/deltacasttv/nmos-vhd-samples/issues).
