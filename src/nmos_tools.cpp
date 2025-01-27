@@ -36,23 +36,25 @@
 #include "tools.h"
 
 #if defined(__APPLE__)
+#include "VideoMasterHD/VideoMasterHD_Ip_Board.h"
 #include "VideoMasterHD/VideoMasterHD_Ip_ST2110_20.h"
+#include "VideoMasterHD/VideoMasterHD_PTP.h"
+#include "VideoMasterHD/VideoMasterHD_String.h"
 #else
+#include "VideoMasterHD_Ip_Board.h"
 #include "VideoMasterHD_Ip_ST2110_20.h"
+#include "VideoMasterHD_PTP.h"
+#include "VideoMasterHD_String.h"
 #endif
 
-nmos_tools::NodeServer::NodeServer(nmos::node_model& node_model, nmos::experimental::node_implementation node_implementation,
-   nmos::experimental::log_model& log_model, slog::base_gate& gate, const std::string device_name, const std::string device_description,
-   std::string media_nic_name, std::string media_nic_mac_address)
-      : node_model(node_model),
-        gate(gate),
-        device_name(device_name),
-        device_description(device_description),
-        media_nic_name(media_nic_name),
-        media_nic_mac_address(media_nic_mac_address),
-        is_enabled(false),
-        sdp(""),
-        node_server(nmos::experimental::make_node_server(node_model, node_implementation, log_model, gate))
+nmos_tools::NodeServer::NodeServer(nmos::node_model& node_model,
+                                   nmos::experimental::node_implementation node_implementation,
+                                   nmos::experimental::log_model& log_model, slog::base_gate& gate,
+                                   const std::string device_name, const std::string device_description,
+                                   std::string media_nic_name, std::string media_nic_mac_address)
+    : node_model(node_model), gate(gate), device_name(device_name), device_description(device_description),
+      media_nic_name(media_nic_name), media_nic_mac_address(media_nic_mac_address), is_enabled(false), sdp(""),
+      node_server(nmos::experimental::make_node_server(node_model, node_implementation, log_model, gate))
 {
 }
 
@@ -148,30 +150,30 @@ bool nmos_tools::NodeServerReceiver::node_implementation_init()
 
       auto lock = node_model.write_lock(); // in order to update the resources
 
-      //start of receiver specific part
+      // start of receiver specific part
       const auto label = U("VHD Video Receiver");
       const auto description = U("VideoMaster HD Video Receiver");
       const auto receiver_id = nmos::make_repeatable_id(seed_id, label);
 
-      const std::vector<utility::string_t> media_interfaces = { utility::conversions::to_string_t(media_nic_name) };
-      auto receiver = nmos::make_video_receiver(receiver_id, device_id, nmos::transports::rtp, media_interfaces, node_model.settings);
+      const std::vector<utility::string_t> media_interfaces = {utility::conversions::to_string_t(media_nic_name)};
+      auto receiver = nmos::make_video_receiver(
+          receiver_id, device_id, nmos::transports::rtp, media_interfaces, node_model.settings);
       receiver.data[nmos::fields::label] = web::json::value::string(label);
       receiver.data[nmos::fields::description] = web::json::value::string(description);
       receiver.data[nmos::fields::caps][nmos::fields::constraint_sets] = generate_constraints();
 
       auto connection_receiver = nmos::make_connection_rtp_receiver(receiver_id, false);
-      connection_receiver.data[nmos::fields::endpoint_constraints].as_array()[0].as_object()[nmos::fields::interface_ip] =
-      web::json::value_of({
-         { nmos::fields::constraint_enum,
-         web::json::value_of({ web::json::value(ipv4_to_string(m_active_transport_params.ip_interface)) })
-         }
-      });
+      connection_receiver.data[nmos::fields::endpoint_constraints]
+          .as_array()[0]
+          .as_object()[nmos::fields::interface_ip] = web::json::value_of(
+          {{nmos::fields::constraint_enum,
+            web::json::value_of({web::json::value(ipv4_to_string(m_active_transport_params.ip_interface))})}});
 
       if (!insert_resource_after(node_model, lock, delay_millis, node_model.node_resources, std::move(receiver), gate))
          throw node_implementation_init_exception("Failed to insert receiver resource");
-      if (!insert_resource_after(node_model, lock, delay_millis, node_model.connection_resources, std::move(connection_receiver), gate))
+      if (!insert_resource_after(
+              node_model, lock, delay_millis, node_model.connection_resources, std::move(connection_receiver), gate))
          throw node_implementation_init_exception("Failed to insert connection receiver resource");
-
    }
    catch (const node_implementation_init_exception& e)
    {
@@ -214,12 +216,17 @@ std::string nmos_tools::NodeServerReceiver::get_sdp()
    return sdp;
 }
 
-bool nmos_tools::NodeServer::insert_resource_after(nmos::node_model &model, nmos::write_lock &lock, unsigned int milliseconds, nmos::resources &resources, nmos::resource &&resource, slog::base_gate &log_gate)
+bool nmos_tools::NodeServer::insert_resource_after(nmos::node_model& model, nmos::write_lock& lock,
+                                                   unsigned int milliseconds, nmos::resources& resources,
+                                                   nmos::resource&& resource, slog::base_gate& log_gate)
 {
-   if (nmos::details::wait_for(model.shutdown_condition, lock, std::chrono::milliseconds(milliseconds), [&] { return this->node_model.shutdown; }))
+   if (nmos::details::wait_for(model.shutdown_condition,
+                               lock,
+                               std::chrono::milliseconds(milliseconds),
+                               [&] { return this->node_model.shutdown; }))
       return false;
 
-   const std::pair<nmos::id, nmos::type> id_type{ resource.id, resource.type };
+   const std::pair<nmos::id, nmos::type> id_type{resource.id, resource.type};
    const bool success = insert_resource(resources, std::move(resource)).second;
 
    if (success)
@@ -227,123 +234,161 @@ bool nmos_tools::NodeServer::insert_resource_after(nmos::node_model &model, nmos
    else
       slog::log<slog::severities::severe>(log_gate, SLOG_FLF) << "Model update error: " << id_type;
 
-   slog::log<slog::severities::more_info>(log_gate, SLOG_FLF) << "Notifying node behaviour thread"; // and anyone else who cares...
+   slog::log<slog::severities::more_info>(log_gate, SLOG_FLF)
+       << "Notifying node behaviour thread"; // and anyone else who cares...
    model.notify();
 
    return success;
 }
 
-bool nmos_tools::NodeServer::is_field_auto(const web::json::value &object, const web::json::field_as_value_or &field_name)
+bool nmos_tools::NodeServer::is_field_auto(const web::json::value& object,
+                                           const web::json::field_as_value_or& field_name)
 {
-   return object.has_field(field_name) &&
-          object.at(field_name).is_string() &&
+   return object.has_field(field_name) && object.at(field_name).is_string() &&
           object.at(field_name).as_string() == U("auto");
 }
 
-nmos_tools::NodeServerReceiver::NodeServerReceiver(nmos::node_model& node_model, nmos::experimental::log_model& log_model, slog::base_gate& gate,
-   const std::string device_name, const std::string device_description, TransportParams& resolve_auto_transport_params,
-   TransportParams& active_transport_params, std::string media_nic_name, std::string media_nic_mac_address)
-   : NodeServer(node_model, make_node_implementation(), log_model, gate, device_name, device_description, media_nic_name, media_nic_mac_address), m_resolve_auto_transport_params(resolve_auto_transport_params), m_active_transport_params(active_transport_params)
+nmos_tools::NodeServerReceiver::NodeServerReceiver(nmos::node_model& node_model,
+                                                   nmos::experimental::log_model& log_model, slog::base_gate& gate,
+                                                   const std::string device_name, const std::string device_description,
+                                                   TransportParams& resolve_auto_transport_params,
+                                                   TransportParams& active_transport_params, std::string media_nic_name,
+                                                   std::string media_nic_mac_address)
+    : NodeServer(node_model, make_node_implementation(), log_model, gate, device_name, device_description,
+                 media_nic_name, media_nic_mac_address),
+      m_resolve_auto_transport_params(resolve_auto_transport_params), m_active_transport_params(active_transport_params)
 {
 }
 
 nmos::experimental::node_implementation nmos_tools::NodeServerReceiver::make_node_implementation()
 {
    auto node_implementation = nmos::experimental::node_implementation();
-   node_implementation.on_system_changed(std::bind(&NodeServerReceiver::system_params_handler, this, std::placeholders::_1, std::placeholders::_2));
-   node_implementation.on_resolve_auto(std::bind(&NodeServerReceiver::resolve_auto, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-   node_implementation.on_connection_activated(std::bind(&NodeServerReceiver::connection_activation, this, std::placeholders::_1, std::placeholders::_2));
-   node_implementation.on_validate_connection_resource_patch(std::bind(&NodeServerReceiver::patch_validator,this,std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
-   node_implementation.on_parse_transport_file(std::bind(&NodeServerReceiver::transportfile_parser, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4));
+   node_implementation.on_system_changed(
+       std::bind(&NodeServerReceiver::system_params_handler, this, std::placeholders::_1, std::placeholders::_2));
+   node_implementation.on_resolve_auto(std::bind(
+       &NodeServerReceiver::resolve_auto, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+   node_implementation.on_connection_activated(
+       std::bind(&NodeServerReceiver::connection_activation, this, std::placeholders::_1, std::placeholders::_2));
+   node_implementation.on_validate_connection_resource_patch(std::bind(&NodeServerReceiver::patch_validator,
+                                                                       this,
+                                                                       std::placeholders::_1,
+                                                                       std::placeholders::_2,
+                                                                       std::placeholders::_3));
+   node_implementation.on_parse_transport_file(std::bind(&NodeServerReceiver::transportfile_parser,
+                                                         this,
+                                                         std::placeholders::_1,
+                                                         std::placeholders::_2,
+                                                         std::placeholders::_3,
+                                                         std::placeholders::_4));
    return node_implementation;
 }
 
-void nmos_tools::NodeServerReceiver::resolve_auto(const nmos::resource &resource, const nmos::resource &connection_resource, web::json::value &transport_params)
+void nmos_tools::NodeServerReceiver::resolve_auto(const nmos::resource& resource,
+                                                  const nmos::resource& connection_resource,
+                                                  web::json::value& transport_params)
 {
-      // debug log the json objects
-   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "resolve_auto_sender: resource: " << std::endl << resource.data.serialize();
-   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "resolve_auto_sender: connection_resource: " << std::endl << connection_resource.data.serialize();
-   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "resolve_auto_sender: transport_params: " << std::endl << transport_params.serialize();
+   // debug log the json objects
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "resolve_auto_sender: resource: " << std::endl
+                                                          << resource.data.serialize();
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "resolve_auto_sender: connection_resource: " << std::endl
+                                                          << connection_resource.data.serialize();
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "resolve_auto_sender: transport_params: " << std::endl
+                                                          << transport_params.serialize();
 
    for (auto& transport_param : transport_params.as_array())
    {
       if (is_field_auto(transport_param, nmos::fields::interface_ip))
       {
-         transport_param[nmos::fields::interface_ip] = web::json::value::string(ipv4_to_string(m_resolve_auto_transport_params.ip_interface));
+         transport_param[nmos::fields::interface_ip] =
+             web::json::value::string(ipv4_to_string(m_resolve_auto_transport_params.ip_interface));
       }
       if (is_field_auto(transport_param, nmos::fields::destination_port))
       {
-         transport_param[nmos::fields::destination_port] = web::json::value::number(m_resolve_auto_transport_params.port_dst);
+         transport_param[nmos::fields::destination_port] =
+             web::json::value::number(m_resolve_auto_transport_params.port_dst);
       }
       if (is_field_auto(transport_param, nmos::fields::multicast_ip))
       {
-         transport_param[nmos::fields::multicast_ip] = web::json::value::string(ipv4_to_string(m_resolve_auto_transport_params.ip_multicast));
+         transport_param[nmos::fields::multicast_ip] =
+             web::json::value::string(ipv4_to_string(m_resolve_auto_transport_params.ip_multicast));
       }
       if (is_field_auto(transport_param, nmos::fields::source_ip))
       {
-         transport_param[nmos::fields::source_ip] = web::json::value::string(ipv4_to_string(m_resolve_auto_transport_params.ip_src));
+         transport_param[nmos::fields::source_ip] =
+             web::json::value::string(ipv4_to_string(m_resolve_auto_transport_params.ip_src));
       }
    }
-   
-   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "resolve_auto_sender: resolved_transport_params: " << std::endl << transport_params.serialize();
+
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF)
+       << "resolve_auto_sender: resolved_transport_params: " << std::endl
+       << transport_params.serialize();
 }
 
-void nmos_tools::NodeServerReceiver::patch_validator(const nmos::resource &resource, const nmos::resource &connection_resource, const web::json::value &endpoint_staged)
+void nmos_tools::NodeServerReceiver::connection_activation(const nmos::resource& resource,
+                                                           const nmos::resource& connection_resource)
 {
    // debug log the json objects
-   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "patch_validator: resource: " << std::endl << resource.data.serialize();
-   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "patch_validator: connection_resource: " << std::endl << connection_resource.data.serialize();
-   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "patch_validator: endpoint_staged: " << std::endl << endpoint_staged.serialize();
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "connection_activation_receiver: resource: " << std::endl
+                                                          << resource.data.serialize();
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF)
+       << "connection_activation_receiver: connection_resource: " << std::endl
+       << connection_resource.data.serialize();
 
-   //check if the sdp is not null
-   if(endpoint_staged.at(nmos::fields::transport_file).at(nmos::fields::data).is_null())
-      throw web::json::json_exception("sdp is null");
-
-}
-
-void nmos_tools::NodeServerReceiver::connection_activation(const nmos::resource &resource, const nmos::resource &connection_resource)
-{
-   // debug log the json objects
-   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "connection_activation_receiver: resource: " << std::endl << resource.data.serialize();
-   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "connection_activation_receiver: connection_resource: " << std::endl << connection_resource.data.serialize();
-
-   //parameters have been activated, communicate those modifications to the sample in order to reflect the model changes
+   // parameters have been activated, communicate those modifications to the sample in order to reflect the model
+   // changes
 
    is_enabled = connection_resource.data.at(nmos::fields::active).at(nmos::fields::master_enable).as_bool();
 
-   const web::json::array& active_transport_params_array = connection_resource.data.at(nmos::fields::active).at(nmos::fields::transport_params).as_array();
+   const web::json::array& active_transport_params_array =
+       connection_resource.data.at(nmos::fields::active).at(nmos::fields::transport_params).as_array();
    const web::json::object& active_transport_params_object = active_transport_params_array.at(0).as_object();
 
-   if(active_transport_params_object.find(nmos::fields::interface_ip) != active_transport_params_object.end() && active_transport_params_object.at(nmos::fields::interface_ip).is_string())
-      m_active_transport_params.ip_interface = string_to_ipv4(active_transport_params_object.at(nmos::fields::interface_ip).as_string());
+   if (active_transport_params_object.find(nmos::fields::interface_ip) != active_transport_params_object.end() &&
+       active_transport_params_object.at(nmos::fields::interface_ip).is_string())
+      m_active_transport_params.ip_interface =
+          string_to_ipv4(active_transport_params_object.at(nmos::fields::interface_ip).as_string());
    else
       m_active_transport_params.ip_interface = 0;
-   if(active_transport_params_object.find(nmos::fields::multicast_ip) != active_transport_params_object.end() && active_transport_params_object.at(nmos::fields::multicast_ip).is_string())
-      m_active_transport_params.ip_multicast = string_to_ipv4(active_transport_params_object.at(nmos::fields::multicast_ip).as_string());
+   if (active_transport_params_object.find(nmos::fields::multicast_ip) != active_transport_params_object.end() &&
+       active_transport_params_object.at(nmos::fields::multicast_ip).is_string())
+      m_active_transport_params.ip_multicast =
+          string_to_ipv4(active_transport_params_object.at(nmos::fields::multicast_ip).as_string());
    else
       m_active_transport_params.ip_multicast = 0;
-   if(active_transport_params_object.find(nmos::fields::source_ip) != active_transport_params_object.end() && active_transport_params_object.at(nmos::fields::source_ip).is_string())
-      m_active_transport_params.ip_src = string_to_ipv4(active_transport_params_object.at(nmos::fields::source_ip).as_string());
+   if (active_transport_params_object.find(nmos::fields::source_ip) != active_transport_params_object.end() &&
+       active_transport_params_object.at(nmos::fields::source_ip).is_string())
+      m_active_transport_params.ip_src =
+          string_to_ipv4(active_transport_params_object.at(nmos::fields::source_ip).as_string());
    else
       m_active_transport_params.ip_src = 0;
    m_active_transport_params.port_dst = active_transport_params_object.at(nmos::fields::destination_port).as_integer();
 
-   const web::json::object& transport_file = connection_resource.data.at(nmos::fields::active).at(nmos::fields::transport_file).as_object();
-   if(transport_file.find(nmos::fields::data) != transport_file.end() && transport_file.at(nmos::fields::data).is_string())
+   const web::json::object& transport_file =
+       connection_resource.data.at(nmos::fields::active).at(nmos::fields::transport_file).as_object();
+   if (transport_file.find(nmos::fields::data) != transport_file.end() &&
+       transport_file.at(nmos::fields::data).is_string())
       sdp = utility::conversions::to_utf8string(transport_file.at(nmos::fields::data).as_string());
    else
-      sdp = ""; //this should not happen, sdp is checked by nmos-cpp before connection is activated
+      sdp = ""; // this should not happen, sdp is checked by nmos-cpp before connection is activated
 }
 
-web::json::value nmos_tools::NodeServerReceiver::transportfile_parser(const nmos::resource &resource, const nmos::resource &connection_resource, const utility::string_t &transportfile_type, const utility::string_t &transportfile_data)
+web::json::value nmos_tools::NodeServerReceiver::transportfile_parser(const nmos::resource& resource,
+                                                                      const nmos::resource& connection_resource,
+                                                                      const utility::string_t& transportfile_type,
+                                                                      const utility::string_t& transportfile_data)
 {
    // debug log the json objects
-   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "transportfile_parser: resource: " << resource.data.serialize();
-   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "transportfile_parser: connection_resource: " << connection_resource.data.serialize();
-   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "transportfile_parser: transportfile_type: " << transportfile_type;
-   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "transportfile_parser: transportfile_data: " << transportfile_data;
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF)
+       << "transportfile_parser: resource: " << resource.data.serialize();
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF)
+       << "transportfile_parser: connection_resource: " << connection_resource.data.serialize();
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF)
+       << "transportfile_parser: transportfile_type: " << transportfile_type;
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF)
+       << "transportfile_parser: transportfile_data: " << transportfile_data;
 
-   web::json::value res = nmos::parse_rtp_transport_file(resource, connection_resource, transportfile_type, transportfile_data, gate);
+   web::json::value res =
+       nmos::parse_rtp_transport_file(resource, connection_resource, transportfile_type, transportfile_data, gate);
    slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "transportfile_parser: result: " << res.serialize();
    return res;
 }
@@ -358,8 +403,10 @@ web::json::value nmos_tools::NodeServerReceiver::generate_constraints()
    bool is_us;
 
    web::json::value constraints = web::json::value::array();
-   for( uint32_t i = 0; i < NB_VHD_ST2110_20_VIDEO_STANDARD; i++) {
-      const VHD_ERRORCODE result = get_video_standard_info(static_cast<VHD_ST2110_20_VIDEO_STANDARD>(i), frame_width, frame_heigth, frame_rate, interlaced, is_us);
+   for (uint32_t i = 0; i < NB_VHD_ST2110_20_VIDEO_STANDARD; i++)
+   {
+      const VHD_ERRORCODE result = get_video_standard_info(
+          static_cast<VHD_ST2110_20_VIDEO_STANDARD>(i), frame_width, frame_heigth, frame_rate, interlaced, is_us);
       if (result != VHDERR_NOERROR)
          throw node_implementation_init_exception("Error while getting video standard info");
 
@@ -375,7 +422,8 @@ web::json::value nmos_tools::NodeServerReceiver::generate_constraints()
       constraint[nmos::caps::format::grain_rate] = nmos::make_caps_rational_constraint({frame_rate_rational});
       constraint[nmos::caps::format::frame_width] = nmos::make_caps_integer_constraint({frame_width});
       constraint[nmos::caps::format::frame_height] = nmos::make_caps_integer_constraint({frame_heigth});
-      constraint[nmos::caps::format::interlace_mode] = nmos::make_caps_string_constraint({interlaced ? nmos::interlace_modes::interlaced_bff.name : nmos::interlace_modes::progressive.name});
+      constraint[nmos::caps::format::interlace_mode] = nmos::make_caps_string_constraint(
+          {interlaced ? nmos::interlace_modes::interlaced_bff.name : nmos::interlace_modes::progressive.name});
       constraint[nmos::caps::format::component_depth] = nmos::make_caps_integer_constraint({10});
       constraint[nmos::caps::format::color_sampling] = nmos::make_caps_string_constraint({U("YCbCr-4:2:2")});
       constraint[nmos::caps::format::transfer_characteristic] = nmos::make_caps_string_constraint({U("SDR")});
@@ -384,6 +432,335 @@ web::json::value nmos_tools::NodeServerReceiver::generate_constraints()
    }
 
    return constraints;
+}
+
+nmos_tools::NodeServerSender::NodeServerSender(nmos::node_model& node_model, nmos::experimental::log_model& log_model,
+                                               slog::base_gate& gate, const std::string device_name,
+                                               const std::string device_description,
+                                               void *board_handle, void *stream_handle,
+                                               TransportParams& resolve_auto_transport_params,
+                                               TransportParams& active_transport_params, std::string media_nic_name,
+                                               std::string media_mac_address, std::string sdp)
+
+    : NodeServer(node_model, make_node_implementation(), log_model, gate, device_name, device_description,
+                 media_nic_name, media_mac_address),
+      resolve_auto_transport_params(resolve_auto_transport_params), active_transport_params(active_transport_params),
+      board_handle(board_handle), stream_handle(stream_handle)
+{
+   this->sdp = sdp;
+}
+
+nmos::experimental::node_implementation nmos_tools::NodeServerSender::make_node_implementation()
+{
+   auto node_implementation = nmos::experimental::node_implementation();
+   node_implementation.on_system_changed(
+       std::bind(&NodeServerSender::system_params_handler, this, std::placeholders::_1, std::placeholders::_2));
+   node_implementation.on_resolve_auto(std::bind(
+       &NodeServerSender::resolve_auto, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+   node_implementation.on_connection_activated(
+       std::bind(&NodeServerSender::connection_activation, this, std::placeholders::_1, std::placeholders::_2));
+   node_implementation.on_validate_connection_resource_patch(std::bind(
+       &NodeServerSender::patch_validator, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+   node_implementation.on_set_transportfile(std::bind(&NodeServerSender::transportfile_setter,
+                                                      this,
+                                                      std::placeholders::_1,
+                                                      std::placeholders::_2,
+                                                      std::placeholders::_3));
+   return node_implementation;
+}
+
+bool nmos_tools::NodeServerSender::update_connection_parameters(uint32_t ip_dst, uint16_t port_dst)
+{
+   VHD_ERRORCODE result;
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_SetStreamProperty(stream_handle, VHD_IP_BRD_SP_IP_DST, static_cast<ULONG>(ip_dst)));
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error setting destination IP: " << to_string(result) << std::endl;
+      VHD_CloseStreamHandle(stream_handle);
+      return result;
+   }
+
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_SetStreamProperty(stream_handle, VHD_IP_BRD_SP_UDP_PORT_DST, static_cast<ULONG>(port_dst)));
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error setting destination UDP port: " << to_string(result) << std::endl;
+      VHD_CloseStreamHandle(stream_handle);
+      return result;
+   }
+   return result == VHDERR_NOERROR;
+}
+
+bool nmos_tools::NodeServerSender::node_implementation_init()
+{
+   const unsigned int delay_millis{ 0 };
+   uint32_t frame_heigth;
+   uint32_t frame_width;
+   uint32_t frame_rate;
+   nmos::rational frame_rate_rational;
+   bool     interlaced;
+   bool     is_us;
+
+   try
+   {
+      NodeServer::node_implementation_init();
+
+      ULONG video_standard_ul;
+      VHD_ERRORCODE result = static_cast<VHD_ERRORCODE>(
+          VHD_GetStreamProperty(stream_handle, VHD_ST2110_20_SP_VIDEO_STANDARD, &video_standard_ul));
+      if (result != VHDERR_NOERROR)
+         throw node_implementation_init_exception("Error while getting video standard");
+
+      const auto video_standard = static_cast<VHD_ST2110_20_VIDEO_STANDARD>(video_standard_ul);
+      if (get_video_standard_info(video_standard, frame_width, frame_heigth, frame_rate, interlaced, is_us) !=
+          VHDERR_NOERROR)
+         throw node_implementation_init_exception("Error while getting video standard info");
+
+      if (is_us)
+         frame_rate_rational = nmos::parse_rational(nmos::make_rational(frame_rate * 1000, 1001));
+      else
+         frame_rate_rational = frame_rate;
+
+      const auto seed_id = nmos::experimental::fields::seed_id(node_model.settings);
+
+      nmos::write_lock lock = node_model.write_lock(); // in order to update the resources
+
+      //Start of sender specific part
+      //Add one source
+      const auto source_id = nmos::make_repeatable_id(seed_id, U("IPVC Video Source"));
+      const auto flow_id = nmos::make_repeatable_id(seed_id, U("IPVC Video Flow"));
+      const auto sender_id = nmos::make_repeatable_id(seed_id, U("IPVC Video Sender"));
+
+      nmos::resource source = nmos::make_video_source(
+          source_id, device_id, nmos::clock_names::clk0, frame_rate_rational, node_model.settings);
+      source.data[nmos::fields::label] = web::json::value::string(U("IPVC Video Source"));
+      source.data[nmos::fields::description] = web::json::value::string(U("IP Virtual Card Video Source"));
+
+      nmos::resource flow = nmos::make_raw_video_flow(flow_id,
+                                                      source_id,
+                                                      device_id,
+                                                      frame_rate_rational,
+                                                      frame_width,
+                                                      frame_heigth,
+                                                      interlaced ? nmos::interlace_modes::interlaced_tff
+                                                                 : nmos::interlace_modes::progressive,
+                                                      nmos::colorspaces::BT709,
+                                                      nmos::transfer_characteristics::SDR,
+                                                      nmos::chroma_subsampling::YCbCr422,
+                                                      10,
+                                                      node_model.settings);
+
+      flow.data[nmos::fields::label] = web::json::value::string(U("IPVC Video Flow"));
+      flow.data[nmos::fields::description] = web::json::value::string(U("IP Virtual Card Video Flow"));
+
+      if (!insert_resource_after(node_model, lock, delay_millis, node_model.node_resources, std::move(source), gate))
+         throw node_implementation_init_exception("Failed to insert source resource");
+      if (!insert_resource_after(node_model, lock, delay_millis, node_model.node_resources, std::move(flow), gate))
+         throw node_implementation_init_exception("Failed to insert flow resource");
+
+      const auto manifest_href = nmos::experimental::make_manifest_api_manifest(sender_id, node_model.settings);
+      auto sender = nmos::make_sender(sender_id,
+                                      flow_id,
+                                      nmos::transports::rtp,
+                                      device_id,
+                                      manifest_href.to_string(),
+                                      {utility::conversions::to_string_t(media_nic_name)},
+                                      node_model.settings);
+      sender.data[nmos::fields::label] = web::json::value::string(U("IPVC Video Sender"));
+      sender.data[nmos::fields::description] = web::json::value::string(U("IP Virtual Card Video Sender"));
+
+      auto connection_sender =
+          nmos::make_connection_rtp_sender(sender_id, false, utility::conversions::to_string_t(sdp));
+
+      connection_sender.data[nmos::fields::endpoint_constraints][0][nmos::fields::source_ip]
+         = web::json::value_of({
+               { nmos::fields::constraint_enum,
+               web::json::value_of({nmos_tools::ipv4_to_string(active_transport_params.ip_src)})},
+                              });
+      connection_sender.data[nmos::fields::endpoint_constraints][0][nmos::fields::source_port] = web::json::value_of({
+          {nmos::fields::constraint_enum, web::json::value_of({active_transport_params.port_src})},
+      });
+
+      if (!insert_resource_after(node_model, lock, delay_millis, node_model.node_resources, std::move(sender), gate))
+         throw node_implementation_init_exception("Failed to insert sender resource");
+      if (!insert_resource_after(
+              node_model, lock, delay_millis, node_model.connection_resources, std::move(connection_sender), gate))
+         throw node_implementation_init_exception("Failed to insert connection sender resource");
+   }
+   catch (const node_implementation_init_exception& e)
+   {
+      // most likely from incorrect value types in the command line settings
+      slog::log<slog::severities::error>(gate, SLOG_FLF) << "Node implementation error: " << e.what();
+      return false;
+   }
+   catch (const web::json::json_exception& e)
+   {
+      // most likely from incorrect value types in the command line settings
+      slog::log<slog::severities::error>(gate, SLOG_FLF) << "JSON error: " << e.what();
+      return false;
+   }
+   catch (const std::system_error& e)
+   {
+      slog::log<slog::severities::error>(gate, SLOG_FLF) << "System error: " << e.what() << " [" << e.code() << "]";
+      return false;
+   }
+   catch (const std::runtime_error& e)
+   {
+      slog::log<slog::severities::error>(gate, SLOG_FLF) << "Implementation error: " << e.what();
+      return false;
+   }
+   catch (const std::exception& e)
+   {
+      slog::log<slog::severities::error>(gate, SLOG_FLF) << "Unexpected exception: " << e.what();
+      return false;
+   }
+   catch (...)
+   {
+      slog::log<slog::severities::severe>(gate, SLOG_FLF) << "Unexpected unknown exception";
+      return false;
+   }
+
+   return true;
+}
+
+void nmos_tools::NodeServerSender::patch_validator(const nmos::resource& resource,
+                                                   const nmos::resource& connection_resource,
+                                                   const web::json::value& endpoint_staged)
+{
+   // debug log the json objects
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "patch_validator: resource: " << std::endl
+                                                          << resource.data.serialize();
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "patch_validator: connection_resource: " << std::endl
+                                                          << connection_resource.data.serialize();
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "patch_validator: endpoint_staged: " << std::endl
+                                                          << endpoint_staged.serialize();
+}
+
+void nmos_tools::NodeServerReceiver::patch_validator(const nmos::resource& resource,
+                                                     const nmos::resource& connection_resource,
+                                                     const web::json::value& endpoint_staged)
+{
+   // debug log the json objects
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "patch_validator: resource: " << std::endl
+                                                          << resource.data.serialize();
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "patch_validator: connection_resource: " << std::endl
+                                                          << connection_resource.data.serialize();
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "patch_validator: endpoint_staged: " << std::endl
+                                                          << endpoint_staged.serialize();
+
+   // check if the sdp is not null
+   if (endpoint_staged.at(nmos::fields::transport_file).at(nmos::fields::data).is_null())
+      throw web::json::json_exception("sdp is null");
+}
+
+void nmos_tools::NodeServerSender::resolve_auto(const nmos::resource& resource,
+                                                const nmos::resource& connection_resource,
+                                                web::json::value& transport_params)
+{
+   // debug log the json objects
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "resolve_auto_sender: resource: " << std::endl
+                                                          << resource.data.serialize();
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "resolve_auto_sender: connection_resource: " << std::endl
+                                                          << connection_resource.data.serialize();
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "resolve_auto_sender: transport_params: " << std::endl
+                                                          << transport_params.serialize();
+
+   for (auto& transport_param : transport_params.as_array())
+   {
+      if (is_field_auto(transport_param, nmos::fields::destination_ip))
+      {
+         transport_param[nmos::fields::destination_ip] =
+             web::json::value::string(ipv4_to_string(resolve_auto_transport_params.ip_dst));
+      }
+      if (is_field_auto(transport_param, nmos::fields::destination_port))
+      {
+         transport_param[nmos::fields::destination_port] =
+             web::json::value::number(resolve_auto_transport_params.port_dst);
+      }
+      if (is_field_auto(transport_param, nmos::fields::source_ip))
+      {
+         transport_param[nmos::fields::source_ip] =
+             web::json::value::string(ipv4_to_string(resolve_auto_transport_params.ip_src));
+      }
+      if (is_field_auto(transport_param, nmos::fields::source_port))
+      {
+         transport_param[nmos::fields::source_port] = web::json::value::number(resolve_auto_transport_params.port_src);
+      }
+   }
+
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF)
+       << "resolve_auto_sender: resolved_transport_params: " << std::endl
+       << transport_params.serialize();
+}
+
+void nmos_tools::NodeServerSender::connection_activation(const nmos::resource& resource,
+                                                         const nmos::resource& connection_resource)
+{
+   // debug log the json objects
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "connection_activation_sender: resource: " << std::endl
+                                                          << resource.data.serialize();
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF)
+       << "connection_activation_sender: connection_resource: " << std::endl
+       << connection_resource.data.serialize();
+
+   // parameters have been activated, communicate those modifications to the sample in order to reflect the model
+   // changes
+
+   is_enabled = connection_resource.data.at(nmos::fields::active).at(nmos::fields::master_enable).as_bool();
+
+   const web::json::array& active_transport_params_array =
+       connection_resource.data.at(nmos::fields::active).at(nmos::fields::transport_params).as_array();
+   const web::json::object& active_transport_params_object = active_transport_params_array.at(0).as_object();
+
+   active_transport_params.ip_dst =
+       string_to_ipv4(active_transport_params_object.at(nmos::fields::destination_ip).as_string());
+   active_transport_params.port_dst = active_transport_params_object.at(nmos::fields::destination_port).as_integer();
+   active_transport_params.ip_src =
+       string_to_ipv4(active_transport_params_object.at(nmos::fields::source_ip).as_string());
+   active_transport_params.port_src = active_transport_params_object.at(nmos::fields::source_port).as_integer();
+}
+
+void nmos_tools::NodeServerSender::transportfile_setter(const nmos::resource& sender,
+                                                        const nmos::resource& connection_sender,
+                                                        web::json::value& endpoint_transportfile)
+{
+   // debug log the json objects
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "transportfile_setter: sender: " << std::endl
+                                                          << sender.data.serialize();
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF) << "transportfile_setter: connection_sender: " << std::endl
+                                                          << connection_sender.data.serialize();
+   slog::log<slog::severities::more_info>(gate, SLOG_FLF)
+       << "transportfile_setter: endpoint_transportfile: " << std::endl
+       << endpoint_transportfile.serialize();
+
+   // update sdp to reflect changes in transport_params
+   const web::json::array& active_transport_params =
+       connection_sender.data.at(U("active")).at(U("transport_params")).as_array();
+
+   // Update the sender with destination IP and port
+   bool update_success =
+       update_connection_parameters(string_to_ipv4(active_transport_params.at(0).at(U("destination_ip")).as_string()),
+                                    active_transport_params.at(0).at(U("destination_port")).as_integer());
+   if (!update_success)
+   {
+      throw web::json::json_exception("Error while updating connection parameters");
+   }
+
+   // sdp must be set before the stream restart, so we have to call generate sdp here
+   std::string sdp;
+   VHD_ERRORCODE result =
+       generate_sdp(board_handle, stream_handle, sdp);
+
+   if (result == VHDERR_NOERROR)
+   {
+      // update sdp
+      endpoint_transportfile.at(U("data")) = web::json::value::string(utility::conversions::to_string_t(sdp));
+   }
+   else
+   {
+      throw web::json::json_exception("Error while generating SDP");
+   }
 }
 
 utility::string_t nmos_tools::ipv4_to_string(uint32_t ipv4_network_byte_order)

@@ -41,9 +41,9 @@ namespace nmos_tools
 
       bool is_enabled;
 
-      NodeServer(nmos::node_model& node_model, nmos::experimental::node_implementation node_implementation, nmos::experimental::log_model& log_model,
-         slog::base_gate& gate, const std::string device_name, const std::string device_description, std::string media_nic_name,
-         std::string media_nic_mac_address);
+      NodeServer(nmos::node_model& node_model, nmos::experimental::node_implementation node_implementation,
+                 nmos::experimental::log_model& log_model, slog::base_gate& gate, const std::string device_name,
+                 const std::string device_description, std::string media_nic_name, std::string media_mac_address);
 
       bool get_ptp_system_parameters(NmosPtpSystemParameters& ptp_system_parameters);
 
@@ -68,14 +68,17 @@ namespace nmos_tools
 
       virtual bool node_implementation_init();
 
-      //callbacks
+      // callbacks
       void system_params_handler(const web::uri& system_uri, const web::json::value& system_global);
-      virtual void resolve_auto(const nmos::resource& resource, const nmos::resource& connection_resource, web::json::value& transport_params) = 0;
-      virtual void patch_validator(const nmos::resource& resource, const nmos::resource& connection_resource, const web::json::value& endpoint_staged) = 0;
+      virtual void resolve_auto(const nmos::resource& resource, const nmos::resource& connection_resource,
+                                web::json::value& transport_params) = 0;
+      virtual void patch_validator(const nmos::resource& resource, const nmos::resource& connection_resource,
+                                   const web::json::value& endpoint_staged) = 0;
       virtual void connection_activation(const nmos::resource& resource, const nmos::resource& connection_resource) = 0;
 
-      //helpers
-      bool insert_resource_after(nmos::node_model &node_model, nmos::write_lock &lock, unsigned int milliseconds, nmos::resources& resources, nmos::resource&& resource, slog::base_gate& gate);
+      // helpers
+      bool insert_resource_after(nmos::node_model& node_model, nmos::write_lock& lock, unsigned int milliseconds,
+                                 nmos::resources& resources, nmos::resource&& resource, slog::base_gate& gate);
       bool is_field_auto(const web::json::value& object, const web::json::field_as_value_or& field_name);
 
       class node_implementation_init_exception : public std::exception
@@ -120,26 +123,81 @@ namespace nmos_tools
 
       TransportParams& m_active_transport_params;
 
-      NodeServerReceiver(nmos::node_model& node_model, nmos::experimental::log_model& log_model, slog::base_gate& gate, const std::string device_name,
-         const   std::string device_description, TransportParams& resolve_auto_transport_params, TransportParams& active_transport_params,
-         std::string media_nic_name, std::string media_nic_mac_address);
+      NodeServerReceiver(nmos::node_model& node_model, nmos::experimental::log_model& log_model, slog::base_gate& gate,
+                         const std::string device_name, const std::string device_description,
+                         TransportParams& resolve_auto_transport_params, TransportParams& active_transport_params,
+                         std::string media_nic_name, std::string media_nic_mac_address);
 
       bool node_implementation_init() override;
 
       std::string get_sdp();
 
-   private:
+    private:
 
       TransportParams& m_resolve_auto_transport_params;
 
       nmos::experimental::node_implementation make_node_implementation();
 
-      void resolve_auto(const nmos::resource& resource, const nmos::resource& connection_resource, web::json::value& transport_params) override;
-      void patch_validator(const nmos::resource& resource, const nmos::resource& connection_resource, const web::json::value& endpoint_staged) override;
+      void resolve_auto(const nmos::resource& resource, const nmos::resource& connection_resource,
+                        web::json::value& transport_params) override;
+      void patch_validator(const nmos::resource& resource, const nmos::resource& connection_resource,
+                           const web::json::value& endpoint_staged) override;
       void connection_activation(const nmos::resource& resource, const nmos::resource& connection_resource) override;
-      web::json::value transportfile_parser(const nmos::resource& resource, const nmos::resource& connection_resource, const utility::string_t& transportfile_type, const utility::string_t& transportfile_data);
-   
+      web::json::value transportfile_parser(const nmos::resource& resource, const nmos::resource& connection_resource,
+                                            const utility::string_t& transportfile_type,
+                                            const utility::string_t& transportfile_data);
+
       web::json::value generate_constraints();
+   };
+
+   class NodeServerSender : public nmos_tools::NodeServer
+   {
+   public:
+
+      struct TransportParams{
+         uint32_t ip_src   /*! Source IP address. */;
+         uint16_t port_src /*! Source port. */;
+         uint32_t ip_dst   /*! Destination IP address. */;
+         uint16_t port_dst /*! Destination port. */;
+         
+         bool operator==(const TransportParams& other) const {
+            return std::tie(ip_src, port_src, ip_dst, port_dst) ==
+                   std::tie(other.ip_src, other.port_src, other.ip_dst, other.port_dst);
+         }
+         bool operator!=(const TransportParams& other) const {
+            return !(*this == other);
+         }
+      };
+
+      TransportParams& active_transport_params;
+
+      NodeServerSender(nmos::node_model& node_model, nmos::experimental::log_model& log_model, slog::base_gate& gate,
+                       const std::string device_name, const std::string device_description,
+                       void *board_handle, void *stream_handle,
+                       TransportParams& resolve_auto_transport_params, TransportParams& active_transport_params,
+                       std::string media_nic_name, std::string media_nic_mac_address, std::string sdp = "");
+
+      bool node_implementation_init() override;
+
+   private:
+
+      void *board_handle;
+      void *stream_handle;
+
+      TransportParams& resolve_auto_transport_params;
+
+      nmos::experimental::node_implementation make_node_implementation();
+
+      bool update_connection_parameters(uint32_t ip_dst, uint16_t port_dst);
+
+      void resolve_auto(const nmos::resource& resource, const nmos::resource& connection_resource,
+                        web::json::value& transport_params) override;
+      void patch_validator(const nmos::resource& resource, const nmos::resource& connection_resource,
+                           const web::json::value& endpoint_staged) override;
+      void connection_activation(const nmos::resource& resource, const nmos::resource& connection_resource) override;
+
+      void transportfile_setter(const nmos::resource& sender, const nmos::resource& connection_sender,
+                                web::json::value& endpoint_transportfile);
    };
 
    // convert the given ipv4 address in network byte order to a string representation of the form "a.b.c.d"
@@ -148,4 +206,3 @@ namespace nmos_tools
    // convert the given string representation of an ipv4 address of the form "a.b.c.d" to an ipv4 address in network byte order
    uint32_t string_to_ipv4(const utility::string_t& ipv4_string);
 }
-

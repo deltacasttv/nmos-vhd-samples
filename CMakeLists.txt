@@ -19,4 +19,5 @@ if (APPLE)
 endif()
 
 add_subdirectory(nmos-cpp/Development/)
+add_subdirectory(video-viewer/)
 add_subdirectory(src)

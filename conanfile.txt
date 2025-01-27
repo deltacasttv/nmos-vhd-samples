@@ -7,6 +7,8 @@ json-schema-validator/2.3.0
 nlohmann_json/3.11.3
 zlib/1.2.13
 jwt-cpp/0.7.0
+glfw/3.4
+glm/cci.20230113
 
 [generators]
 CMakeDeps

@@ -5,3 +5,4 @@ if(TARGET nmos-cpp::nmos-cpp)
 endif()
 
 add_subdirectory(receiver)
+add_subdirectory(sender)
