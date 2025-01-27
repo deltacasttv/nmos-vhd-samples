@@ -90,6 +90,20 @@ VHD_ERRORCODE configure_nic(HANDLE board_handle /*!< [in] Board handle.*/,
 );
 
 /*!
+   @brief This function configures a TX stream based on the given parameters.
+
+   @returns The function returns the status of its execution as VHD_ERRORCODE
+*/
+VHD_ERRORCODE configure_stream(HANDLE board_handle /*!< [in] Board handle*/,
+                               HANDLE& stream_handle /*!< [out] Handle of the created stream*/,
+                               VHD_STREAMTYPE stream_type /*!< [in] Type of the stream to configure*/,
+                               VHD_ST2110_20_VIDEO_STANDARD video_standard /*!< [in] Video standard of the stream*/,
+                               uint32_t destination_ip /*!< [in] Destination IP of the stream*/,
+                               uint32_t destination_ssrc /*!< [in] Destination SSRC of the stream*/,
+                               uint16_t destination_udp_port /*!< [in] Destination UDP port of the stream*/
+);
+
+/*!
    @brief This function manages stream creation and configuration based on a SDP
 
    @returns The function returns the status of its execution as VHD_ERRORCODE
@@ -100,6 +114,16 @@ VHD_ERRORCODE configure_stream_from_sdp(HANDLE board /*!< [in] Board handle*/,
                                         const uint16_t destination_udp_port_ovverrides /*!< [in] To override the destination UDP port contained in the SDP.*/,
                                         HANDLE stream /*!< [in] Handle of the created stream */,
                                         uint32_t& multicast_group /*!< [out] Multicast group the has been joined, 0 if none */
+);
+
+/*!
+   @brief This function generates an SDP based on a stream configuration.
+
+   @returns The function returns the status of its execution as VMIP_ERRORCODE
+*/
+VHD_ERRORCODE generate_sdp(HANDLE board_handle  /*!< [in] VCS context used by the stream */,
+                           HANDLE stream_handle /*!< [in] stream used for the SDP generation */,
+                           std::string& sdp     /*!< [out] SDP generated*/
 );
 
 /*!
@@ -136,3 +160,8 @@ VHD_ERRORCODE print_ptp_status(HANDLE board_handle /*!< [in] Board handle.*/,
    @brief This function monitor RX stream status
 */
 void monitor_rx_stream_status(HANDLE stream_handle, bool* request_stop, uint32_t* timeout);
+
+/*!
+   @brief This function monitor TX stream status
+*/
+void monitor_tx_stream_status(HANDLE stream_handle, bool* request_stop);

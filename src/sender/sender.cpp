@@ -16,9 +16,10 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <cstring>
 #include <thread>
 
-#if defined(__GNUC__) && !(defined(__APPLE__))
+#if defined(__GNUC__) && !defined(__APPLE__)
 #include <stdint-gcc.h>
 #else
 #include <stdint.h>
@@ -40,8 +41,7 @@
 
 #include "../tools.h"
 #include "../nmos_tools.h"
-
-#include "videoviewer/videoviewer.hpp"
+#include "pattern.h"
 
 #if defined(__APPLE__)
 #include "VideoMasterHD/VideoMasterHD_Core.h"
@@ -54,18 +54,10 @@
 #include "VideoMasterHD_Ip_ST2110_20.h"
 #endif
 
-#if !defined(__APPLE__)
-static void render_video(Deltacast::VideoViewer& viewer,
-                         int frame_rate_in_ms)
-{
-   viewer.render_loop(frame_rate_in_ms);
-}
-#endif
-
 int main(int argc, char* argv[])
 {
    //VHD parameters
-   const uint32_t board_id = 0;
+   const uint32_t board_id = 1;
 
    //Media NIC
    const std::string media_nic_name = "delta" + std::to_string(board_id);  //Streaming network interface controller
@@ -74,23 +66,30 @@ int main(int argc, char* argv[])
    const uint32_t media_nic_subnet_mask = 0xffffff00; // Streaming network interface controller subnet mask
    const bool media_nic_dhcp = false; // Streaming network interface controller DHCP enabled
 
-   //NMOS parameters
-   const std::string management_nic_ip = "192.168.0.10"; //Management network interface controller
-   const uint32_t default_destination_address = 0xef0a0a01; //default IP destination address used for resolving "auto" nmos parameter
-   const uint16_t default_destination_udp_port = 1025; //default UDP destination port used for resolving "auto" nmos parameter IP address
+   // Stream parameters
+   const uint32_t destination_address = 0xe0000001; // IP destination address
+   const uint16_t destination_udp_port = 1025; // UDP destination port
+   const uint32_t destination_ssrc = 0x12345600; // SSRC destination
+   const auto video_standard = VHD_ST2110_20_VIDEOSTD_1920x1080p60; // Streaming video standard
+
+   // NMOS parameters
+   const std::string management_nic_ip = "192.168.0.10"; // Management network interface controller
+   const uint32_t default_destination_address =
+       destination_address; // default IP destination address used for resolving "auto" nmos parameter
+   const uint16_t default_destination_udp_port =
+       destination_udp_port; // default UDP destination port used for resolving "auto" nmos parameter IP address
 
    //Node parameters
-   const std::string node_label = "VHD Rx Node";
-   const std::string node_description = "Deltacast IP Card NMOS RX Demonstration Sample";
-   const std::string device_name = "VHD Rx Device";
-   const std::string device_description = "Deltacast IP Card RX Device";
+   const std::string node_label = "VHD Tx Node";
+   const std::string node_description = "Deltacast IP Card NMOS TX Demonstration Sample";
+   const std::string device_name = "VHD Tx Device";
+   const std::string device_description = "Deltacast IP Card TX Device";
    const std::string node_domain = "local.domain."; //domain name where your machine is located
    const int node_api_port = 3212; //port used by the node to expose its registry API
    const int connection_api_port = 3215; //port used by the node to expose its connection API
 
-
    HANDLE board = nullptr, stream = nullptr, slot = nullptr;
-   VHD_STREAMTYPE stream_type = VHD_ST_RX0;
+   VHD_STREAMTYPE stream_type = VHD_ST_TX0;
    VHD_ERRORCODE result = VHDERR_NOERROR;
 
    uint32_t frame_width;
@@ -98,23 +97,24 @@ int main(int argc, char* argv[])
    uint32_t frame_rate;
    bool     interlaced;
    bool     is_us;
-   Deltacast::VideoViewer viewer;
 
    std::string media_nic_mac_address;
 
    //Buffer that will be created and filled by the API
    uint8_t* buffer = nullptr;
    ULONG buffer_size = 0, index = 0;
-   uint32_t multicast_group = 0u;
+   std::vector<uint8_t> video_pattern_buffer;
+   std::string sdp;
+   nmos_tools::NodeServerSender::TransportParams resolve_auto_transport_params;
 
    bool exit = false;
 
    init_keyboard();
 
-   std::cout << "DELTA-IP NMOS ST2110-20 RECEPTION SAMPLE APPLICATION\n(c) DELTACAST\n--------------------------------------------------------"
-      << std::endl << std::endl;
-
-   nmos_tools::NodeServerReceiver::TransportParams resolve_auto_transport_params;
+   std::cout << "DELTA-IP NMOS ST2110-20 TRANSMISSION SAMPLE APPLICATION\n(c) "
+                "DELTACAST\n--------------------------------------------------------"
+             << std::endl
+             << std::endl;
 
    result = static_cast<VHD_ERRORCODE>(VHD_OpenBoardHandle(board_id, &board, nullptr, 0ul));
    if (result != VHDERR_NOERROR)
@@ -129,9 +129,9 @@ int main(int argc, char* argv[])
       {
          std::cout << "Error when configuring the NIC" << " [" << to_string(result) << "]" << std::endl;
       }
-      resolve_auto_transport_params.ip_interface = media_nic_ip;
-      resolve_auto_transport_params.ip_multicast = default_destination_address;
-      resolve_auto_transport_params.ip_src = 0; //no filtering on source ip
+      resolve_auto_transport_params.ip_src = media_nic_ip;
+      resolve_auto_transport_params.port_src = 2000;
+      resolve_auto_transport_params.ip_dst = default_destination_address;
       resolve_auto_transport_params.port_dst = default_destination_udp_port;
    }
    if (result == VHDERR_NOERROR)
@@ -140,6 +140,40 @@ int main(int argc, char* argv[])
       if(result != VHDERR_NOERROR)
       {
          std::cout << "Error when getting the MAC address" << " [" << to_string(result) << "]" << std::endl;
+      }
+   }
+
+   if (result == VHDERR_NOERROR)
+   {
+      result = configure_stream(
+          board, stream, stream_type, video_standard, destination_address, destination_ssrc, destination_udp_port);
+      if (result != VHDERR_NOERROR)
+      {
+         std::cout << "Error when configuring the stream"
+                   << " [" << to_string(result) << "]" << std::endl;
+      }
+   }
+
+   // Generate the SDP
+   if (result == VHDERR_NOERROR)
+   {
+      result = generate_sdp(board, stream, sdp);
+      if (result != VHDERR_NOERROR)
+      {
+         std::cout << "Error when generating the SDP" << " [" << to_string(result) << "]" << std::endl;
+      }
+   }
+
+   if(result == VHDERR_NOERROR)
+   {
+      //Extract details from video standard
+      result = get_video_standard_info(video_standard, frame_width, frame_height, frame_rate, interlaced, is_us);
+
+      if(result == VHDERR_NOERROR)
+      {
+         //Video pattern generation
+         video_pattern_buffer.resize(frame_width * frame_height * PIXELSIZE_8BIT);
+         create_color_bar_pattern(video_pattern_buffer.data(), frame_height, frame_width);
       }
    }
 
@@ -154,6 +188,8 @@ int main(int argc, char* argv[])
 
    nmos::experimental::log_gate gate(error_log, access_log, log_model);
 
+   std::cout << "Starting nmos node" << std::endl;
+
    web::json::value hostAddresses = web::json::value::array();
    hostAddresses[0] = web::json::value::string(utility::conversions::to_string_t(management_nic_ip));
    node_model.settings[nmos::fields::host_addresses] = hostAddresses;
@@ -164,22 +200,34 @@ int main(int argc, char* argv[])
 #endif
    node_model.settings[nmos::experimental::fields::seed_id] = web::json::value::string(U("f885a687-71e9-4b7b-a8da-bfd730cd2839"));
    node_model.settings[nmos::fields::label] = web::json::value::string(utility::conversions::to_string_t(node_label));
-   node_model.settings[nmos::fields::description] = web::json::value::string(utility::conversions::to_string_t(node_description));
+   node_model.settings[nmos::fields::description] =
+       web::json::value::string(utility::conversions::to_string_t(node_description));
    node_model.settings[nmos::fields::domain] = web::json::value::string(utility::conversions::to_string_t(node_domain));
    node_model.settings[nmos::fields::node_port] = web::json::value::number(node_api_port);
    node_model.settings[nmos::fields::connection_port] = web::json::value::number(connection_api_port);
-   node_model.settings[nmos::fields::logging_level] = slog::severities::warning; //change this to change the logging level
+   node_model.settings[nmos::fields::logging_level] =
+       slog::severities::warning; // change this to change the logging level
 
    log_model.settings = node_model.settings;
    log_model.level = nmos::fields::logging_level(log_model.settings);
 
-   nmos_tools::NodeServerReceiver::TransportParams active_transport_params = resolve_auto_transport_params;
-   nmos_tools::NodeServerReceiver node_server(node_model, log_model, gate, device_name, device_description,
-      resolve_auto_transport_params, active_transport_params, media_nic_name, media_nic_mac_address);
+   nmos_tools::NodeServerSender::TransportParams active_transport_params = resolve_auto_transport_params;
+   nmos_tools::NodeServerSender node_server(node_model,
+                                            log_model,
+                                            gate,
+                                            device_name,
+                                            device_description,
+                                            board,
+                                            stream,
+                                            resolve_auto_transport_params,
+                                            active_transport_params,
+                                            media_nic_name,
+                                            media_nic_mac_address,
+                                            sdp);
 
    if(!node_server.node_implementation_init())
    {
-      result = VHDERR_OPERATIONFAILED;
+      result = VHDERR_FATALERROR;
       std::cout << "Error when initializing the node server" << " [" << to_string(result) << "]" << std::endl;
    }
 
@@ -189,29 +237,23 @@ int main(int argc, char* argv[])
       std::cout << "NMOS: node ready for connections" << std::endl;
    }
 
-   nmos_tools::NodeServerReceiver::TransportParams previous_transport_params = resolve_auto_transport_params;
-   std::string previous_sdp = "INVALID SDP";
+   nmos_tools::NodeServerSender::TransportParams previous_transport_params = resolve_auto_transport_params;
 
    //Get the system parameters and apply new PTP parameters
-   nmos_tools::NmosPtpSystemParameters ptp_system_parameters;
-   nmos_tools::NmosPtpSystemParameters previous_ptp_system_parameters;
+   nmos_tools::NmosPtpSystemParameters ptp_system_parameters = {};
+   nmos_tools::NmosPtpSystemParameters previous_ptp_system_parameters = {0, 0};
 
-   while(result == VHDERR_NOERROR && !exit){
-
+   while(result == VHDERR_NOERROR && !exit)
+   {
       //Wait for the stream to be enabled
       while(node_server.is_enabled == false)
       {
          if (_kbhit())
-         {
-            _getch();
-            exit = true;
-            break;
-         }
-         if (viewer.window_request_close())
-         {
-            exit = true;
-            break;
-         }
+            {
+               _getch();
+               exit = true;
+               break;
+            }
 
          //While the stream is disabled, we have to react to PTP changes
          if(node_server.get_ptp_system_parameters(ptp_system_parameters)) //if get_ptp_system_parameters returns false,
@@ -238,86 +280,61 @@ int main(int argc, char* argv[])
          std::this_thread::sleep_for(std::chrono::milliseconds(100));
       }
 
-      //to not start and stop the transmission
-      if(exit)
+      // to not start and stop the transmission
+      if (exit)
          break;
 
-      std::string sdp = node_server.get_sdp();
-      if(previous_transport_params != active_transport_params || sdp != previous_sdp)
+      if (previous_transport_params != active_transport_params)
       {
-         std::cout << "New transport parameters received or SDP changed" << std::endl;
+         // active parameters were changed, we need to update the stream
+         result = static_cast<VHD_ERRORCODE>(VHD_CloseStreamHandle(stream));
+         if (result != VHDERR_NOERROR)
+            std::cout << "Error when closing the stream"
+                      << " [" << to_string(result) << "]" << std::endl;
 
-         //active parameters were changed, we need to update the stream
-         if (stream != nullptr) {
-            result = static_cast<VHD_ERRORCODE>(VHD_CloseStreamHandle(stream));
-            if (result != VHDERR_NOERROR)
-               std::cout << "Error when destroying the stream" << " [" << to_string(result) << "]" << std::endl;
-         }
          if (result == VHDERR_NOERROR)
          {
-            result = static_cast<VHD_ERRORCODE>(VHD_OpenStreamHandle(board, stream_type, VHD_ST2110_STPROC_DISJOINED_VIDEO, nullptr, &stream, nullptr));
-            if (result != VHDERR_NOERROR)
-               std::cout << "Error when creating stream" << " [" << to_string(result) << "]" << std::endl;
-         }
-         leave_multicast(board, multicast_group);
-         if(result == VHDERR_NOERROR)
-         {
-            result = configure_stream_from_sdp(board, sdp, active_transport_params.ip_multicast, active_transport_params.port_dst, stream, multicast_group);
-            previous_transport_params = active_transport_params;
-            previous_sdp = sdp;
-            if (result != VHDERR_NOERROR)
-               std::cout << "Error when configuring stream" << " [" << to_string(result) << "]" << std::endl;
-         }
-         if (result == VHDERR_NOERROR)
-         {
-            ULONG video_standard;
-            result = static_cast<VHD_ERRORCODE>(VHD_GetStreamProperty(stream, VHD_ST2110_20_SP_VIDEO_STANDARD, &video_standard));
+            result = configure_stream(board,
+                                      stream,
+                                      stream_type,
+                                      video_standard,
+                                      active_transport_params.ip_dst,
+                                      destination_ssrc,
+                                      active_transport_params.port_dst);
             if (result == VHDERR_NOERROR)
             {
-               result = get_video_standard_info(static_cast<VHD_ST2110_20_VIDEO_STANDARD>(video_standard), frame_width, frame_height, frame_rate, interlaced, is_us);
-               if (result != VHDERR_NOERROR)
-                  std::cout << "Error when getting video standard info" << std::endl;
+               previous_transport_params = active_transport_params;
+            }
+            else
+            {
+               std::cout << "Error when creating stream"
+                         << " [" << to_string(result) << "]" << std::endl;
             }
          }
 
+         // Regenerate the SDP
+         if (result == VHDERR_NOERROR)
+            result = generate_sdp(board, stream, sdp);
       }
 
       if(result == VHDERR_NOERROR)
       {
          result = static_cast<VHD_ERRORCODE>(VHD_StartStream(stream));
          if (result != VHDERR_NOERROR)
+         {
             std::cout << "Error when starting stream" << " [" << to_string(result) << "]" << std::endl;
+         }
       }
 
-      if (result == VHDERR_NOERROR)
+      if(result == VHDERR_NOERROR)
       {
-         std::cout << std::endl << "Received Sdp : " << std::endl << sdp << std::endl;
-         std::cout << std::endl << "Reception started, press any key to stop..." << std::endl;
+         std::cout << std::endl << "Generated Sdp : " << std::endl << sdp << std::endl;
+         std::cout << std::endl << "Transmission started, press any key to stop..." << std::endl;
 
-         if (!viewer.init(960,
-                          540,
-                          node_label.c_str(),
-                          frame_width,
-                          frame_height,
-                          Deltacast::VideoViewer::InputFormat::ycbcr_422_10_le_msb))
-         {
-            std::cout << "VideoViewer initialization failed" << std::endl;
-            return -1;
-         }
-         viewer.start();
-
-#ifndef __APPLE__
-         std::thread viewerthread(render_video, std::ref(viewer), 100);
-#endif
-
-         uint8_t* viewer_data = nullptr;
-         uint64_t viewer_data_size = 0;
-
-         uint32_t slot_timeout = 0;
          bool stop_monitoring = false;
-         std::thread monitoring_thread(monitor_rx_stream_status, stream, &stop_monitoring, &slot_timeout);
-
-         //Reception loop
+         std::thread monitoring_thread (monitor_tx_stream_status, stream, &stop_monitoring);
+         uint32_t line = 0;
+         //Transmission loop
          while (1)
          {
             if (_kbhit())
@@ -326,40 +343,18 @@ int main(int argc, char* argv[])
                exit = true;
                break;
             }
-            if (viewer.window_request_close())
-            {
-               exit = true;
-               break;
-            }
 
-            sdp = node_server.get_sdp();
-            if(!node_server.is_enabled)
-            {
-               std::cout << "node server disabled; exit reception loop" << std::endl;
+            if (!node_server.is_enabled || previous_transport_params != active_transport_params)
                break;
-            }
-            if (previous_transport_params != active_transport_params)
-            {
-               std::cout << "active transport params changed; exit reception loop" << std::endl;
-               break;
-            }
-            if (sdp != previous_sdp)
-            {
-               std::cout << "sdp changed; exit reception loop" << std::endl;
-               break;
-            }
 
-            //Try to lock the next slot.
+            // Try to lock the next slot.
             result = static_cast<VHD_ERRORCODE>(VHD_LockSlotHandle(stream, &slot));
+
             if (result != VHDERR_NOERROR)
             {
-               if (result == VHDERR_TIMEOUT)
-               {
-                  slot_timeout++;
-                  result = VHDERR_NOERROR; //After the above print message, timeout error is considered as handled
-                  continue;
-               }
-               std::cout << "Error when locking slot " << index << " [" << to_string(result) << "]" << std::endl;
+               std::cout << std::endl
+                         << "Error when locking slot at slot " << index << " [" << to_string(result) << "]"
+                         << std::endl;
                break;
             }
 
@@ -367,40 +362,27 @@ int main(int argc, char* argv[])
             result = static_cast<VHD_ERRORCODE>(VHD_GetSlotBuffer(slot, VHD_ST2110_BT_VIDEO, &buffer, &buffer_size));
             if (result != VHDERR_NOERROR)
             {
-               std::cout << "Error when getting slot buffer at slot " << index << " [" << to_string(result) << "]" << std::endl;
+               std::cout << std::endl << "Error when getting slot buffer at slot " << index << " [" << to_string(result) << "]" << std::endl;
             }
 
-            viewer.lock_data(&viewer_data, &viewer_data_size);
-            if (viewer_data_size != buffer_size)
-            {
-               std::cout << "Buffer size (" << buffer_size << ") does not match with videoviewer data size ("
-                         << viewer_data_size << ")" << std::endl;
-            }
-            else
-            {
-               std::memcpy(viewer_data, buffer, buffer_size);
-            }
-            viewer.unlock_data();
+            std::memcpy(buffer, video_pattern_buffer.data(), buffer_size);
 
-            //Unlock the slot. buffer wont be available anymore
+            draw_white_line(buffer, line, frame_height, frame_width, interlaced);
+
+            line++;
+            if (line > frame_height - 1) line = 0;
+
+            //Unlock the slot. pBuffer wont be available anymore
             result = static_cast<VHD_ERRORCODE>(VHD_UnlockSlotHandle(slot));
+
             if (result != VHDERR_NOERROR)
             {
-               std::cout << "Error when unlocking slot at slot " << index << " [" << to_string(result) << "]" << std::endl;
+               std::cout << std::endl << "Error when unlocking slot at slot " << index << " [" << to_string(result) << "]" << std::endl;
                break;
             }
 
-            viewer.process_escape_key();
-            viewer.render_iteration();
-
             index++;
          }
-
-         viewer.stop();
-#ifndef __APPLE__
-         viewerthread.join();
-#endif
-         viewer.release();
 
          stop_monitoring = true;
          monitoring_thread.join();
@@ -410,26 +392,17 @@ int main(int argc, char* argv[])
          result_stop_stream = static_cast<VHD_ERRORCODE>(VHD_StopStream(stream));
          if (result_stop_stream != VHDERR_NOERROR)
          {
-            std::cout << "Error when stopping the stream" << " [" << to_string(result_stop_stream) << "]" << std::endl;
+            std::cout << "Error when stopping the stream"<< " [" << to_string(result_stop_stream) << "]" << std::endl;
             result = result_stop_stream;
          }
       }
    }
-
 
    if(stream)
    {
       result = static_cast<VHD_ERRORCODE>(VHD_CloseStreamHandle(stream));
       if (result != VHDERR_NOERROR)
          std::cout << "Error when closing the stream" << " [" << to_string(result) << "]" << std::endl;
-   }
-
-   if (board)
-   {
-      leave_multicast(board, multicast_group);
-      result = static_cast<VHD_ERRORCODE>(VHD_CloseBoardHandle(board));
-      if (result != VHDERR_NOERROR)
-         std::cout << "Error when closing the board handle" << " [" << to_string(result) << "]" << std::endl;
    }
 
    close_keyboard();

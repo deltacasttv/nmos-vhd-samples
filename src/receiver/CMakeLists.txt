@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.19)
 
+if(TARGET video-viewer)
+   link_libraries(video-viewer)
+endif()
+
 set(receiver_SOURCE
    ${receiver_SOURCE_DIR}receiver.cpp
    ${receiver_SOURCE_DIR}../tools.cpp

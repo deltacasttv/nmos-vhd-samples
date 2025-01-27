@@ -50,14 +50,16 @@ VHD_ERRORCODE get_nic_mac_address(HANDLE board_handle, std::string& mac_address)
    VHD_ERRORCODE result;
    ULONG mac_lsw, mac_msw;
 
-   result = static_cast<VHD_ERRORCODE>(VHD_GetEthernetPortProperty(board_handle, VHD_IP_BRD_ETHERNETPORT_ETH_0, VHD_IP_BRD_EP_FACTORY_MAC_ADDR_LSW, &mac_lsw));
+   result = static_cast<VHD_ERRORCODE>(VHD_GetEthernetPortProperty(
+       board_handle, VHD_IP_BRD_ETHERNETPORT_ETH_0, VHD_IP_BRD_EP_FACTORY_MAC_ADDR_LSW, &mac_lsw));
    if (result != VHDERR_NOERROR)
    {
       std::cout << "Error getting MAC address LSW: " << to_string(result) << std::endl;
       return result;
    }
 
-   result = static_cast<VHD_ERRORCODE>(VHD_GetEthernetPortProperty(board_handle, VHD_IP_BRD_ETHERNETPORT_ETH_0, VHD_IP_BRD_EP_FACTORY_MAC_ADDR_MSW, &mac_msw));
+   result = static_cast<VHD_ERRORCODE>(VHD_GetEthernetPortProperty(
+       board_handle, VHD_IP_BRD_ETHERNETPORT_ETH_0, VHD_IP_BRD_EP_FACTORY_MAC_ADDR_MSW, &mac_msw));
    if (result != VHDERR_NOERROR)
    {
       std::cout << "Error getting MAC address MSW: " << to_string(result) << std::endl;
@@ -229,56 +231,191 @@ VHD_ERRORCODE get_video_standard_info(VHD_ST2110_20_VIDEO_STANDARD video_standar
    return VHDERR_NOERROR;
 }
 
-VHD_ERRORCODE configure_nic(HANDLE board_handle, uint32_t ip_address, uint32_t subnet_mask, uint32_t gateway, bool is_dhcp_enabled)
+VHD_ERRORCODE configure_nic(HANDLE board_handle, uint32_t ip_address, uint32_t subnet_mask, uint32_t gateway,
+                            bool is_dhcp_enabled)
 {
-    VHD_ERRORCODE result;
+   VHD_ERRORCODE result;
 
-    if (!is_dhcp_enabled)
-    {
-        // Disable DHCP
-        result = static_cast<VHD_ERRORCODE>(VHD_DisableDHCP(board_handle, VHD_IP_BRD_ETHERNETPORT_ETH_0));
-        if (result != VHDERR_NOERROR)
-        {
-            std::cout << "Error disabling DHCP: " << to_string(result) << std::endl;
-            return result;
-        }
+   if (!is_dhcp_enabled)
+   {
+      // Disable DHCP
+      result = static_cast<VHD_ERRORCODE>(VHD_DisableDHCP(board_handle, VHD_IP_BRD_ETHERNETPORT_ETH_0));
+      if (result != VHDERR_NOERROR)
+      {
+         std::cout << "Error disabling DHCP: " << to_string(result) << std::endl;
+         return result;
+      }
 
-        // Set IP address
-        result = static_cast<VHD_ERRORCODE>(VHD_SetEthernetPortProperty(board_handle, VHD_IP_BRD_ETHERNETPORT_ETH_0, VHD_IP_BRD_EP_IP_ADDR, ip_address));
-        if (result != VHDERR_NOERROR)
-        {
-            std::cout << "Error setting IP address: " << to_string(result) << std::endl;
-            return result;
-        }
+      // Set IP address
+      result = static_cast<VHD_ERRORCODE>(
+          VHD_SetEthernetPortProperty(board_handle, VHD_IP_BRD_ETHERNETPORT_ETH_0, VHD_IP_BRD_EP_IP_ADDR, ip_address));
+      if (result != VHDERR_NOERROR)
+      {
+         std::cout << "Error setting IP address: " << to_string(result) << std::endl;
+         return result;
+      }
 
-        // Set subnet mask
-        result = static_cast<VHD_ERRORCODE>(VHD_SetEthernetPortProperty(board_handle, VHD_IP_BRD_ETHERNETPORT_ETH_0, VHD_IP_BRD_EP_SUBNET_MASK, subnet_mask));
-        if (result != VHDERR_NOERROR)
-        {
-            std::cout << "Error setting subnet mask: " << to_string(result) << std::endl;
-            return result;
-        }
+      // Set subnet mask
+      result = static_cast<VHD_ERRORCODE>(VHD_SetEthernetPortProperty(
+          board_handle, VHD_IP_BRD_ETHERNETPORT_ETH_0, VHD_IP_BRD_EP_SUBNET_MASK, subnet_mask));
+      if (result != VHDERR_NOERROR)
+      {
+         std::cout << "Error setting subnet mask: " << to_string(result) << std::endl;
+         return result;
+      }
 
-        // Set gateway
-        result = static_cast<VHD_ERRORCODE>(VHD_SetEthernetPortProperty(board_handle, VHD_IP_BRD_ETHERNETPORT_ETH_0, VHD_IP_BRD_EP_GATEWAY_ADDR, gateway));
-        if (result != VHDERR_NOERROR)
-        {
-            std::cout << "Error setting gateway: " << to_string(result) << std::endl;
-            return result;
-        }
-    }
-    else
-    {
-       // Enable DHCP
-       result = static_cast<VHD_ERRORCODE>(VHD_EnableDHCP(board_handle, VHD_IP_BRD_ETHERNETPORT_ETH_0));
-       if (result != VHDERR_NOERROR)
-       {
-           std::cout << "Error enabling DHCP: " << to_string(result) << std::endl;
-           return result;
-       }
-    }
+      // Set gateway
+      result = static_cast<VHD_ERRORCODE>(VHD_SetEthernetPortProperty(
+          board_handle, VHD_IP_BRD_ETHERNETPORT_ETH_0, VHD_IP_BRD_EP_GATEWAY_ADDR, gateway));
+      if (result != VHDERR_NOERROR)
+      {
+         std::cout << "Error setting gateway: " << to_string(result) << std::endl;
+         return result;
+      }
+   }
+   else
+   {
+      // Enable DHCP
+      result = static_cast<VHD_ERRORCODE>(VHD_EnableDHCP(board_handle, VHD_IP_BRD_ETHERNETPORT_ETH_0));
+      if (result != VHDERR_NOERROR)
+      {
+         std::cout << "Error enabling DHCP: " << to_string(result) << std::endl;
+         return result;
+      }
+   }
 
-    return VHDERR_NOERROR;
+   return VHDERR_NOERROR;
+}
+
+VHD_ERRORCODE configure_stream(HANDLE board_handle,
+                               HANDLE& stream_handle,
+                               VHD_STREAMTYPE stream_type,
+                               VHD_ST2110_20_VIDEO_STANDARD video_standard,
+                               uint32_t destination_ip,
+                               uint32_t destination_ssrc,
+                               uint16_t destination_udp_port)
+{
+   VHD_ERRORCODE result;
+   uint32_t frame_width;
+   uint32_t frame_height;
+   uint32_t frame_rate;
+   bool interlaced;
+   bool is_us;
+   result = get_video_standard_info(video_standard, frame_width, frame_height, frame_rate, interlaced, is_us);
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error getting video standard info: " << to_string(result) << std::endl;
+      return result;
+   }
+   if (is_us)
+      VHD_SetBoardProperty(board_handle, VHD_SDI_BP_CLOCK_SYSTEM, VHD_CLOCKDIV_1001);
+   else
+      VHD_SetBoardProperty(board_handle, VHD_SDI_BP_CLOCK_SYSTEM, VHD_CLOCKDIV_1);
+
+   result = static_cast<VHD_ERRORCODE>(VHD_OpenStreamHandle(
+       board_handle, stream_type, VHD_ST2110_STPROC_DISJOINED_VIDEO, nullptr, &stream_handle, nullptr));
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error opening stream handle: " << to_string(result) << std::endl;
+      return result;
+   }
+
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_SetStreamProperty(stream_handle, VHD_CORE_SP_BUFFER_PACKING, VHD_BUFPACK_VIDEO_YUV422_8));
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error setting buffer packing: " << to_string(result) << std::endl;
+      VHD_CloseStreamHandle(stream_handle);
+      return result;
+   }
+
+   result = static_cast<VHD_ERRORCODE>(VHD_SetStreamProperty(stream_handle, VHD_CORE_SP_IO_TIMEOUT, 200));
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error setting IO timeout: " << to_string(result) << std::endl;
+      VHD_CloseStreamHandle(stream_handle);
+      return result;
+   }
+
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_SetStreamProperty(stream_handle, VHD_CORE_SP_TRANSFER_SCHEME, VHD_TRANSFER_SLAVED));
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error setting transfer scheme: " << to_string(result) << std::endl;
+      VHD_CloseStreamHandle(stream_handle);
+      return result;
+   }
+
+   result = static_cast<VHD_ERRORCODE>(VHD_SetStreamProperty(stream_handle, VHD_IP_BRD_BP_ARP_TIMEOUT, 10000));
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error setting ARP timeout: " << to_string(result) << std::endl;
+      VHD_CloseStreamHandle(stream_handle);
+      return result;
+   }
+
+   result = static_cast<VHD_ERRORCODE>(VHD_SetStreamProperty(stream_handle, VHD_IP_BRD_SP_IP_DST, destination_ip));
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error setting destination IP: " << to_string(result) << std::endl;
+      VHD_CloseStreamHandle(stream_handle);
+      return result;
+   }
+
+   result = static_cast<VHD_ERRORCODE>(VHD_SetStreamProperty(stream_handle, VHD_IP_BRD_SP_SSRC, destination_ssrc));
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error setting SSRC: " << to_string(result) << std::endl;
+      VHD_CloseStreamHandle(stream_handle);
+      return result;
+   }
+
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_SetStreamProperty(stream_handle, VHD_IP_BRD_SP_UDP_PORT_DST, destination_udp_port));
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error setting destination UDP port: " << to_string(result) << std::endl;
+      VHD_CloseStreamHandle(stream_handle);
+      return result;
+   }
+
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_SetStreamProperty(stream_handle, VHD_ST2110_20_SP_SAMPLING, VHD_ST2110_20_SAMPLING_YUV_422));
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error setting sampling: " << to_string(result) << std::endl;
+      VHD_CloseStreamHandle(stream_handle);
+      return result;
+   }
+
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_SetStreamProperty(stream_handle, VHD_ST2110_20_SP_DEPTH, VHD_ST2110_20_DEPTH_10BIT));
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error setting depth: " << to_string(result) << std::endl;
+      VHD_CloseStreamHandle(stream_handle);
+      return result;
+   }
+
+   result = static_cast<VHD_ERRORCODE>(VHD_SetStreamProperty(
+       stream_handle, VHD_ST2110_20_SP_TRAFFIC_SHAPING_MODE, VHD_ST2110_20_TRAFFIC_SHAPING_MODE_LINEAR));
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error setting traffic shaping mode: " << to_string(result) << std::endl;
+      VHD_CloseStreamHandle(stream_handle);
+      return result;
+   }
+
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_SetStreamProperty(stream_handle, VHD_ST2110_20_SP_VIDEO_STANDARD, video_standard));
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error setting video standard: " << to_string(result) << std::endl;
+      VHD_CloseStreamHandle(stream_handle);
+      return result;
+   }
+
+   return VHDERR_NOERROR;
 }
 
 VHD_ERRORCODE configure_stream_from_sdp(HANDLE board_handle,
@@ -288,51 +425,61 @@ VHD_ERRORCODE configure_stream_from_sdp(HANDLE board_handle,
                                         HANDLE stream_handle,
                                         uint32_t& multicast_group)
 {
-
    VHD_ERRORCODE result;
    HANDLE sdp_parser_handle = NULL;
    ULONG video_standard, sampling, depth, udp_port, ip_address;
-   
+
    multicast_group = 0u;
 
    // const-cast
-   result = static_cast<VHD_ERRORCODE>(VHD_OpenSDPParserHandle(const_cast<char*>(sdp.c_str()), static_cast<ULONG>(sdp.length()), &sdp_parser_handle));
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_OpenSDPParserHandle(const_cast<char*>(sdp.c_str()), static_cast<ULONG>(sdp.length()), &sdp_parser_handle));
    if (result != VHDERR_NOERROR)
    {
       std::cout << "Error opening SDP parser handle: " << to_string(result) << std::endl;
       return result;
    }
 
-   result = static_cast<VHD_ERRORCODE>(VHD_GetSDPStreamProperty(sdp_parser_handle, VHD_SDP_STREAM_PROPERTY_VIDEO_STANDARD, &video_standard));
-   if (result != VHDERR_NOERROR) {
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_GetSDPStreamProperty(sdp_parser_handle, VHD_SDP_STREAM_PROPERTY_VIDEO_STANDARD, &video_standard));
+   if (result != VHDERR_NOERROR)
+   {
       std::cout << "Error getting video standard: " << to_string(result) << std::endl;
       VHD_CloseSDPParserHandle(sdp_parser_handle);
       return result;
    }
 
-   result = static_cast<VHD_ERRORCODE>(VHD_GetSDPStreamProperty(sdp_parser_handle, VHD_SDP_STREAM_PROPERTY_VIDEO_SAMPLING, &sampling));
-   if (result != VHDERR_NOERROR) {
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_GetSDPStreamProperty(sdp_parser_handle, VHD_SDP_STREAM_PROPERTY_VIDEO_SAMPLING, &sampling));
+   if (result != VHDERR_NOERROR)
+   {
       std::cout << "Error getting video sampling: " << to_string(result) << std::endl;
       VHD_CloseSDPParserHandle(sdp_parser_handle);
       return result;
    }
 
-   result = static_cast<VHD_ERRORCODE>(VHD_GetSDPStreamProperty(sdp_parser_handle, VHD_SDP_STREAM_PROPERTY_VIDEO_BIT_DEPTH, &depth));
-   if (result != VHDERR_NOERROR) {
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_GetSDPStreamProperty(sdp_parser_handle, VHD_SDP_STREAM_PROPERTY_VIDEO_BIT_DEPTH, &depth));
+   if (result != VHDERR_NOERROR)
+   {
       std::cout << "Error getting video bit depth: " << to_string(result) << std::endl;
       VHD_CloseSDPParserHandle(sdp_parser_handle);
       return result;
    }
 
-   result = static_cast<VHD_ERRORCODE>(VHD_GetSDPStreamProperty(sdp_parser_handle, VHD_SDP_STREAM_PROPERTY_VIDEO_DESTINATION_UDP_PORT, &udp_port));
-   if (result != VHDERR_NOERROR) {
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_GetSDPStreamProperty(sdp_parser_handle, VHD_SDP_STREAM_PROPERTY_VIDEO_DESTINATION_UDP_PORT, &udp_port));
+   if (result != VHDERR_NOERROR)
+   {
       std::cout << "Error getting UDP port: " << to_string(result) << std::endl;
       VHD_CloseSDPParserHandle(sdp_parser_handle);
       return result;
    }
 
-   result = static_cast<VHD_ERRORCODE>(VHD_GetSDPStreamProperty(sdp_parser_handle, VHD_SDP_STREAM_PROPERTY_VIDEO_DESTINATION_IP_ADDRESS, &ip_address));
-   if (result != VHDERR_NOERROR) {
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_GetSDPStreamProperty(sdp_parser_handle, VHD_SDP_STREAM_PROPERTY_VIDEO_DESTINATION_IP_ADDRESS, &ip_address));
+   if (result != VHDERR_NOERROR)
+   {
       std::cout << "Error getting IP address: " << to_string(result) << std::endl;
       VHD_CloseSDPParserHandle(sdp_parser_handle);
       return result;
@@ -350,16 +497,20 @@ VHD_ERRORCODE configure_stream_from_sdp(HANDLE board_handle,
 
    // Configure board properties
    result = static_cast<VHD_ERRORCODE>(VHD_SetBoardProperty(board_handle, VHD_IP_BRD_BP_RX0_UDP_PORT, udp_port));
-   if (result != VHDERR_NOERROR) {
+   if (result != VHDERR_NOERROR)
+   {
       std::cout << "Error setting board UDP port: " << to_string(result) << std::endl;
       VHD_CloseSDPParserHandle(sdp_parser_handle);
       return result;
    }
 
-   if ((ip_address & 0xF0000000) == 0xE0000000) { // Check if IP address is multicast
+   if ((ip_address & 0xF0000000) == 0xE0000000)
+   { // Check if IP address is multicast
       // Join multicast group
-      result = static_cast<VHD_ERRORCODE>(VHD_JoinMulticastGroup(board_handle, VHD_IP_BRD_ETHERNETPORT_ETH_0, ip_address));
-      if (result != VHDERR_NOERROR) {
+      result =
+          static_cast<VHD_ERRORCODE>(VHD_JoinMulticastGroup(board_handle, VHD_IP_BRD_ETHERNETPORT_ETH_0, ip_address));
+      if (result != VHDERR_NOERROR)
+      {
          std::cout << "Error joining multicast group: " << to_string(result) << std::endl;
          VHD_CloseSDPParserHandle(sdp_parser_handle);
          return result;
@@ -368,15 +519,19 @@ VHD_ERRORCODE configure_stream_from_sdp(HANDLE board_handle,
    }
 
    // Configure stream properties
-   result = static_cast<VHD_ERRORCODE>(VHD_SetStreamProperty(stream_handle, VHD_CORE_SP_TRANSFER_SCHEME, VHD_TRANSFER_SLAVED));
-   if (result != VHDERR_NOERROR) {
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_SetStreamProperty(stream_handle, VHD_CORE_SP_TRANSFER_SCHEME, VHD_TRANSFER_SLAVED));
+   if (result != VHDERR_NOERROR)
+   {
       std::cout << "Error setting transfer scheme: " << to_string(result) << std::endl;
       VHD_CloseSDPParserHandle(sdp_parser_handle);
       return result;
    }
 
-   result = static_cast<VHD_ERRORCODE>(VHD_SetStreamProperty(stream_handle, VHD_ST2110_20_SP_VIDEO_STANDARD, video_standard));
-   if (result != VHDERR_NOERROR) {
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_SetStreamProperty(stream_handle, VHD_ST2110_20_SP_VIDEO_STANDARD, video_standard));
+   if (result != VHDERR_NOERROR)
+   {
       std::cout << "Error setting video standard: " << to_string(result) << std::endl;
       VHD_CloseSDPParserHandle(sdp_parser_handle);
       return result;
@@ -392,6 +547,13 @@ VHD_ERRORCODE configure_stream_from_sdp(HANDLE board_handle,
    result = static_cast<VHD_ERRORCODE>(VHD_SetStreamProperty(stream_handle, VHD_ST2110_20_SP_DEPTH, depth));
    if (result != VHDERR_NOERROR) {
       std::cout << "Error setting depth: " << to_string(result) << std::endl;
+      VHD_CloseSDPParserHandle(sdp_parser_handle);
+      return result;
+   }
+
+   result = static_cast<VHD_ERRORCODE>(VHD_SetStreamProperty(stream_handle, VHD_CORE_SP_BUFFER_PACKING, VHD_BUFPACK_VIDEO_YUV422_10));
+   if (result != VHDERR_NOERROR) {
+      std::cout << "Error setting buffer packing: " << to_string(result) << std::endl;
       VHD_CloseSDPParserHandle(sdp_parser_handle);
       return result;
    }
@@ -422,7 +584,8 @@ VHD_ERRORCODE configure_stream_from_sdp(HANDLE board_handle,
 
    // Set filtering mask
    const ULONG FilteringMask_UL = VHD_IP_FILTER_IP_ADDR_DEST | VHD_IP_FILTER_UDP_PORT_DEST;
-   result = static_cast<VHD_ERRORCODE>(VHD_SetBoardProperty(board_handle, VHD_IP_BRD_SP_FILTERING_MASK, FilteringMask_UL));
+   result =
+       static_cast<VHD_ERRORCODE>(VHD_SetBoardProperty(board_handle, VHD_IP_BRD_SP_FILTERING_MASK, FilteringMask_UL));
    if (result != VHDERR_NOERROR) {
       std::cout << "Error setting VHD_IP_BRD_SP_FILTERING_MASK: " << to_string(result) << std::endl;
       VHD_CloseSDPParserHandle(sdp_parser_handle);
@@ -432,14 +595,138 @@ VHD_ERRORCODE configure_stream_from_sdp(HANDLE board_handle,
    // Print configuration
    std::cout << "Configuration:" << std::endl;
    std::cout << "\tVideo:" << std::endl;
-   std::cout << "\t\tVideo standard: " << VHD_ST2110_20_VIDEO_STANDARD_ToPrettyString(static_cast<VHD_ST2110_20_VIDEO_STANDARD>(video_standard)) << std::endl;
-   std::cout << "\t\tVideo sampling: " << VHD_ST2110_20_SAMPLING_ToPrettyString(static_cast<VHD_ST2110_20_SAMPLING>(sampling)) << std::endl;
-   std::cout << "\t\tDepth: " << VHD_ST2110_20_DEPTH_ToPrettyString(static_cast<VHD_ST2110_20_DEPTH>(depth)) << std::endl;
+   std::cout << "\t\tVideo standard: "
+             << VHD_ST2110_20_VIDEO_STANDARD_ToPrettyString(static_cast<VHD_ST2110_20_VIDEO_STANDARD>(video_standard))
+             << std::endl;
+   std::cout << "\t\tVideo sampling: "
+             << VHD_ST2110_20_SAMPLING_ToPrettyString(static_cast<VHD_ST2110_20_SAMPLING>(sampling)) << std::endl;
+   std::cout << "\t\tDepth: " << VHD_ST2110_20_DEPTH_ToPrettyString(static_cast<VHD_ST2110_20_DEPTH>(depth))
+             << std::endl;
    std::cout << "\tUDP port: " << udp_port << std::endl;
    std::cout << "\tIP address: " << ip_address << std::endl;
 
    VHD_CloseSDPParserHandle(sdp_parser_handle);
    return VHDERR_NOERROR;
+}
+
+VHD_ERRORCODE generate_sdp(HANDLE board_handle, HANDLE stream_handle, std::string& sdp)
+{
+   HANDLE sdp_parser_handle = nullptr;
+   std::vector<char> sdp_buffer(4096, 0);
+   VHD_ERRORCODE result;
+   const char *version = "0";
+   const char *originator = "- 30676506 46291097 IN IP4  ";
+   const char *description = "VHD Stream";
+   const char *colorimetry = "BT709";
+
+   char work_buffer[256]; // VHD don't support const char* buffers
+
+   ULONG ip_address;
+   ULONG dest_ip_address;
+   ULONG dest_port;
+   ULONG video_standard;
+   ULONG bit_depth;
+
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_GetEthernetPortProperty(board_handle, VHD_IP_BRD_ETHERNETPORT_ETH_0, VHD_IP_BRD_EP_IP_ADDR, &ip_address));
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error getting IP address: " << to_string(result) << std::endl;
+      return result;
+   }
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_GetStreamProperty(stream_handle, VHD_IP_BRD_SP_IP_DST, &dest_ip_address));
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error getting destination IP address: " << to_string(result) << std::endl;
+      return result;
+   }
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_GetStreamProperty(stream_handle, VHD_IP_BRD_SP_UDP_PORT_DST, &dest_port));
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error getting destination UDP port: " << to_string(result) << std::endl;
+      return result;
+   }
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_GetStreamProperty(stream_handle, VHD_ST2110_20_SP_VIDEO_STANDARD, &video_standard));
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error getting video standard: " << to_string(result) << std::endl;
+      return result;
+   }
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_GetStreamProperty(stream_handle, VHD_ST2110_20_SP_DEPTH, &bit_depth));
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error getting bit depth: " << to_string(result) << std::endl;
+      return result;
+   }
+
+   result = static_cast<VHD_ERRORCODE>(
+       VHD_OpenSDPParserHandle(work_buffer, 0, &sdp_parser_handle));
+   if (result != VHDERR_NOERROR)
+   {
+      std::cout << "Error opening SDP parser handle: " << to_string(result) << std::endl;
+      return result;
+   }
+
+   std::strcpy(work_buffer, version);
+   VHD_AddSDPField(sdp_parser_handle,
+                   VHD_SDP_DESCRIPTION_TYPE_SESSION,
+                   0,
+                   VHD_SDP_SESSION_FIELD_VERSION,
+                   work_buffer,
+                   static_cast<ULONG>(strlen(work_buffer)));
+
+   std::strcpy(work_buffer, originator);
+   VHD_AddSDPField(sdp_parser_handle,
+                   VHD_SDP_DESCRIPTION_TYPE_SESSION,
+                   0,
+                   VHD_SDP_SESSION_FIELD_ORIGINATOR,
+                   work_buffer,
+                   static_cast<ULONG>(strlen(work_buffer)));
+
+   std::strcpy(work_buffer, description);
+   VHD_AddSDPField(sdp_parser_handle,
+                   VHD_SDP_DESCRIPTION_TYPE_SESSION,
+                   0,
+                   VHD_SDP_SESSION_FIELD_NAME,
+                   work_buffer,
+                   static_cast<ULONG>(strlen(work_buffer)));
+
+   VHD_SetSDPStreamProperty(sdp_parser_handle, VHD_SDP_STREAM_PROPERTY_SOURCE_IP_ADDRESS, ip_address);
+   VHD_SetSDPStreamProperty(sdp_parser_handle, VHD_SDP_STREAM_PROPERTY_START_TIME, 0);
+   VHD_SetSDPStreamProperty(sdp_parser_handle, VHD_SDP_STREAM_PROPERTY_END_TIME, 0);
+
+   VHD_SetSDPStreamProperty(sdp_parser_handle, VHD_SDP_STREAM_PROPERTY_VIDEO_RTP_PAYLOAD_ID, 98);
+   VHD_SetSDPStreamProperty(sdp_parser_handle, VHD_SDP_STREAM_PROPERTY_VIDEO_DESTINATION_UDP_PORT, dest_port);
+   VHD_SetSDPStreamProperty(sdp_parser_handle, VHD_SDP_STREAM_PROPERTY_VIDEO_STANDARD, video_standard);
+   VHD_SetSDPStreamProperty(sdp_parser_handle, VHD_SDP_STREAM_PROPERTY_VIDEO_SAMPLING, VHD_ST2110_20_SAMPLING_YUV_422);
+   VHD_SetSDPStreamProperty(sdp_parser_handle, VHD_SDP_STREAM_PROPERTY_VIDEO_BIT_DEPTH, bit_depth);
+   std::strcpy(work_buffer, colorimetry);
+   VHD_SetSDPStringStreamProperty(sdp_parser_handle,
+                                  VHD_SDP_STREAM_PROPERTY_VIDEO_COLORIMETRY,
+                                  work_buffer,
+                                  static_cast<ULONG>(strlen(work_buffer)));
+   VHD_SetSDPStreamProperty(sdp_parser_handle, VHD_SDP_STREAM_PROPERTY_VIDEO_DESTINATION_IP_ADDRESS, dest_ip_address);
+   VHD_SetSDPStreamProperty(sdp_parser_handle,
+                            VHD_SDP_STREAM_PROPERTY_VIDEO_TRAFFIC_SHAPING_SENDER_TYPE,
+                            VHD_ST2110_20_TRAFFIC_SHAPING_MODE_LINEAR);
+
+   ULONG buffer_size = sdp_buffer.size();
+   result = static_cast<VHD_ERRORCODE>(VHD_GetSDPBuffer(sdp_parser_handle, sdp_buffer.data(), &buffer_size));
+   if (result != VHDERR_NOERROR || buffer_size > sdp_buffer.size())
+   {
+      VHD_CloseSDPParserHandle(sdp_parser_handle);
+      std::cout << "Error getting SDP buffer: " << to_string(result) << std::endl;
+      return result;
+   }
+   VHD_CloseSDPParserHandle(sdp_parser_handle);
+
+   sdp = std::string(sdp_buffer.data(), buffer_size);
+
+   return result;
 }
 
 VHD_ERRORCODE leave_multicast(HANDLE board, uint32_t& multicast_group)
@@ -518,8 +805,8 @@ VHD_ERRORCODE print_ptp_status(HANDLE board_handle, uint8_t domain_number, uint8
     // Calculate total offset in seconds
     double total_offset = offset_sec + (offset_nsec / 1e9);
 
-    std::cout << "PTP : Domain Number = " << static_cast<int>(domain_number) 
-              << " Announce Receipt Timeout = " << static_cast<int>(announce_receipt_timeout) 
+    std::cout << "PTP : Domain Number = " << static_cast<int>(domain_number)
+              << " Announce Receipt Timeout = " << static_cast<int>(announce_receipt_timeout)
               << " State = " << to_string(ptp_state)
               << " (Offset : " << total_offset << " seconds)                 \r" << std::flush;
 
@@ -534,16 +821,39 @@ void monitor_rx_stream_status(HANDLE stream_handle, bool* request_stop, uint32_t
    ULONG JitterMax = 0;
    ULONG DatagramCount = 0;
 
-   while(!*request_stop)
+   while (!*request_stop)
    {
       VHD_GetStreamProperty(stream_handle, VHD_CORE_SP_SLOTS_COUNT, &SlotsCount);
       VHD_GetStreamProperty(stream_handle, VHD_CORE_SP_SLOTS_DROPPED, &SlotsDropped);
       VHD_GetStreamProperty(stream_handle, VHD_IP_BRD_SP_JITTER_MAX, &JitterMax);
       VHD_GetStreamProperty(stream_handle, VHD_IP_BRD_SP_DATAGRAM_COUNT, &DatagramCount);
 
-      std::cout << "SlotCount: " << SlotsCount << " - SlotDropped: " << SlotsDropped 
-                << " - JitterMax: " << JitterMax << " - DatagramCount: " << DatagramCount 
+      std::cout << "SlotCount: " << SlotsCount << " - SlotDropped: " << SlotsDropped
+                << " - JitterMax: " << JitterMax << " - DatagramCount: " << DatagramCount
                 << " - Timeout: " << *timeout << "                      \r" << std::flush;
+
+      std::this_thread::sleep_for(100ms);
+   }
+}
+
+void monitor_tx_stream_status(HANDLE stream_handle, bool* request_stop)
+{
+   ULONG SlotsCount = 0;
+   ULONG SlotsDropped = 0;
+   ULONG JitterMax = 0;
+   ULONG DatagramCount = 0;
+
+   while (!*request_stop)
+   {
+      VHD_GetStreamProperty(stream_handle, VHD_CORE_SP_SLOTS_COUNT, &SlotsCount);
+      VHD_GetStreamProperty(stream_handle, VHD_CORE_SP_SLOTS_DROPPED, &SlotsDropped);
+      VHD_GetStreamProperty(stream_handle, VHD_IP_BRD_SP_JITTER_MAX, &JitterMax);
+      VHD_GetStreamProperty(stream_handle, VHD_IP_BRD_SP_DATAGRAM_COUNT, &DatagramCount);
+
+      std::cout << "SlotCount: " << SlotsCount
+                << " - SlotDropped: " << SlotsDropped
+                << " - JitterMax: " << JitterMax
+                << " - DatagramCount: " << DatagramCount << "                      \r" << std::flush;
 
       std::this_thread::sleep_for(100ms);
    }

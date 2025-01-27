@@ -6,9 +6,13 @@ NMOS, as defined by AMWA (Advanced Media Workflow Association), is a set of spec
 
 The NMOS VHD samples showcase the basic structure and usage of the NMOS APIs in conjunction with [DELTACAST](https://www.deltacast.tv/) VideoMaster API. It can be used as a reference for implementing VHD solutions in media production and distribution workflows using NMOS.
 
-The sample include a Receiver Node Sample, which demonstrates the implementation of a receiver node capable of discovering, connecting to, and displaying streams from NMOS-compliant sender nodes. This sample utilizes the NMOS IS-04 and IS-05 specifications for discovery and connection management. It showcases the ability to dynamically discover available sender nodes on the network, establish connections with them, and receive and display the video streams they send. By providing a practical example of NMOS functionality integration into a receiver application, this sample serves as a valuable reference for developers.
+The samples include a Receiver Node Sample and a Sender Node Sample. 
 
-This sample serve as reference implementation for developers looking to build NMOS-compliant receiver nodes. It demonstrates the usage of the NMOS APIs, including discovery, connection management, and streaming. By studying and modifying the sample, developers can gain a better understanding of how to integrate NMOS functionality into their own applications with the [DELTACAST](https://www.deltacast.tv/) VideoMaster SDK.
+The Receiver Node Sample demonstrates the implementation of a receiver node capable of discovering, connecting to, and displaying streams from NMOS-compliant sender nodes. This sample utilizes the NMOS IS-04 and IS-05 specifications for discovery and connection management. It showcases the ability to dynamically discover available sender nodes on the network, establish connections with them, and receive and display the video streams they send. By providing a practical example of NMOS functionality integration into a receiver application, this sample serves as a valuable reference for developers.
+
+The Sender Node Sample demonstrates the implementation of a sender node capable of sending streams to NMOS-compliant receiver nodes. This sample also utilizes the NMOS IS-04 and IS-05 specifications for discovery and connection management. It showcases the ability to dynamically advertise available streams on the network and establish connections with receiver nodes. By providing a practical example of NMOS functionality integration into a sender application, this sample serves as a valuable reference for developers.
+
+These samples serve as reference implementations for developers looking to build NMOS-compliant receiver and sender nodes. They demonstrate the usage of the NMOS APIs, including discovery, connection management, and streaming. By studying and modifying the samples, developers can gain a better understanding of how to integrate NMOS functionality into their own applications with the [DELTACAST](https://www.deltacast.tv/) VideoMaster SDK.
 
 ## Features
 - Supports the following NMOS specifications:
@@ -73,7 +77,7 @@ For more details, refer to the [nmos-cpp documentation](https://github.com/sony/
 ## Parameters
 
 The NMOS VHD Samples do not take any command line parameter.
-You have to edit [receiver.cpp](src/receiver/receiver.cpp) to change the parameters. They are located at the beginning of the main function. Some parameters must be changed according to your environment to make the sample work. Those parameters are :
+You have to edit [receiver.cpp](src/receiver/receiver.cpp) and [sender.cpp](src/sender/sender.cpp) to change the parameters. They are located at the beginning of the main function. Some parameters must be changed according to your environment to make the sample work. Those parameters are :
   | Parameter | Description |
   |-----------|-------------|
   | `board_id` | The board ID of the DELTACAST IP Card. |
@@ -95,7 +99,9 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 ```
 
-The executable will be compiled in the following directory: `/build/src/receiver/`
+The executables will be compiled in the following directories:
+ - `/build/src/receiver/`
+ - `/build/src/sender/`
 
  ### Firewall configuration
  If you experience troubles connecting the NMOS VHD Samples to your NMOS infrastructure, you may need to configure your machine firewall to allow the following ports:
