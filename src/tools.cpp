@@ -14,6 +14,7 @@
  */
 
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <iomanip>
@@ -559,7 +560,7 @@ VHD_ERRORCODE configure_stream_from_sdp(HANDLE board_handle,
    }
 
    // Set destination IP for filtering
-   result = static_cast<VHD_ERRORCODE>(VHD_SetBoardProperty(board_handle, VHD_IP_BRD_SP_IP_DST, ip_address));
+   result = static_cast<VHD_ERRORCODE>(VHD_SetStreamProperty(stream_handle, VHD_IP_BRD_SP_IP_DST, ip_address));
    if (result != VHDERR_NOERROR) {
       std::cout << "Error setting VHD_IP_BRD_SP_IP_DST: " << to_string(result) << std::endl;
       VHD_CloseSDPParserHandle(sdp_parser_handle);
@@ -567,7 +568,7 @@ VHD_ERRORCODE configure_stream_from_sdp(HANDLE board_handle,
    }
 
    // Set destination IP for SPS filtering
-   result = static_cast<VHD_ERRORCODE>(VHD_SetBoardProperty(board_handle, VHD_IP_BRD_SP_SPS_IP_DST, ip_address));
+   result = static_cast<VHD_ERRORCODE>(VHD_SetStreamProperty(stream_handle, VHD_IP_BRD_SP_SPS_IP_DST, ip_address));
    if (result != VHDERR_NOERROR) {
       std::cout << "Error setting VHD_IP_BRD_SP_SPS_IP_DST: " << to_string(result) << std::endl;
       VHD_CloseSDPParserHandle(sdp_parser_handle);
@@ -575,7 +576,7 @@ VHD_ERRORCODE configure_stream_from_sdp(HANDLE board_handle,
    }
 
    // Set UDP port for filtering
-   result = static_cast<VHD_ERRORCODE>(VHD_SetBoardProperty(board_handle, VHD_IP_BRD_SP_UDP_PORT_DST, udp_port));
+   result = static_cast<VHD_ERRORCODE>(VHD_SetStreamProperty(stream_handle, VHD_IP_BRD_SP_UDP_PORT_DST, udp_port));
    if (result != VHDERR_NOERROR) {
       std::cout << "Error setting VHD_IP_BRD_SP_UDP_PORT_DST: " << to_string(result) << std::endl;
       VHD_CloseSDPParserHandle(sdp_parser_handle);
@@ -585,7 +586,7 @@ VHD_ERRORCODE configure_stream_from_sdp(HANDLE board_handle,
    // Set filtering mask
    const ULONG FilteringMask_UL = VHD_IP_FILTER_IP_ADDR_DEST | VHD_IP_FILTER_UDP_PORT_DEST;
    result =
-       static_cast<VHD_ERRORCODE>(VHD_SetBoardProperty(board_handle, VHD_IP_BRD_SP_FILTERING_MASK, FilteringMask_UL));
+       static_cast<VHD_ERRORCODE>(VHD_SetStreamProperty(stream_handle, VHD_IP_BRD_SP_FILTERING_MASK, FilteringMask_UL));
    if (result != VHDERR_NOERROR) {
       std::cout << "Error setting VHD_IP_BRD_SP_FILTERING_MASK: " << to_string(result) << std::endl;
       VHD_CloseSDPParserHandle(sdp_parser_handle);
